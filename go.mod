@@ -1,1 +1,3 @@
-module "porter"
+module porter
+
+go 1.15

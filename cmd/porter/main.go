@@ -14,7 +14,12 @@ var (
 )
 
 const banner string = `
-
+______          _            
+| ___ \        | |           
+| |_/ /__  _ __| |_ ___ _ __ 
+|  __/ _ \| '__| __/ _ \ '__|
+| | | (_) | |  | ||  __/ |   
+\_|  \___/|_|   \__\___|_|
 `
 
 func main() {
@@ -27,7 +32,7 @@ func main() {
 	}
 
 	fmt.Print(banner)
-	fmt.Printf("versiom is %s,build at %s\n",Date,Version)
+	fmt.Printf("versiom is %s, build at %s\n",Date,Version)
 
 	if len(*configFile) == 0 {
 		fmt.Println("configFile.len error, err: config is nil")
