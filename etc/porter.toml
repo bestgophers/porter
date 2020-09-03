@@ -49,3 +49,13 @@ targert_mysql_addr = "127.0.0.1:3306"
 target_mysql_user = "root"
 target_mysql_pass = "yaoyichen52"
 target_mysql_charset = "utf8"
+
+
+
+# Raft
+raft_cluster = "http://127.0.0.1:8080,http://127.0.0.1:8081,http://127.0.0.1:8082"
+raft_port = 8080
+raft_id = "raft_01"
+raft_join = false
+raft_wal_dir = "raft-wal"
+raft_snap_dir = "raft-snap"
