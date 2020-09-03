@@ -3,13 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/pingcap/errors"
 	"os"
 	"os/signal"
+	"porter/config"
+	"porter/server"
 	"syscall"
 )
 
 var (
-	Date string
+	Date    string
 	Version string
 )
 
@@ -23,27 +26,34 @@ ______          _
 `
 
 func main() {
-	configFile := flag.String("config", "./porter.yaml", "porter config file")
+	configFile := flag.String("config", "./etc/porter.toml", "porter config file")
 	printVersion := flag.Bool("version", true, "print porter version info")
 	flag.Parse()
 
 	if *printVersion {
-		fmt.Printf("version is %s, build at %s\n",Date,Version)
+		fmt.Printf("version is %s, build at %s\n", Date, Version)
 	}
 
 	fmt.Print(banner)
-	fmt.Printf("versiom is %s, build at %s\n",Date,Version)
+	fmt.Printf("versiom is %s, build at %s\n", Date, Version)
 
 	if len(*configFile) == 0 {
 		fmt.Println("configFile.len error, err: config is nil")
 		return
 	}
 	// build config
-
-	// init
+	porterConfig, err := config.NewPorterConfig(*configFile)
+	if err != nil {
+		fmt.Printf("NewPorterConfig error, err:%s\n", err.Error())
+		return
+	}
 
 	// start
-
+	s, err := server.NewServer(porterConfig)
+	if err != nil {
+		println(errors.ErrorStack(err))
+		return
+	}
 
 	// exit func
 	sc := make(chan os.Signal, 1)
@@ -54,7 +64,7 @@ func main() {
 
 	go func() {
 		for true {
-			sig := <- sc
+			sig := <-sc
 			if sig == syscall.SIGINT || sig == syscall.SIGTERM || sig == syscall.SIGQUIT {
 				// stop
 				os.Exit(0)
@@ -62,4 +72,5 @@ func main() {
 		}
 	}()
 
+	s.Run()
 }
