@@ -10,7 +10,7 @@ and the order of binlog event is exactly the the same as that on the master
 
 ### Overview
 
-<img src="/docs/architecture.jpg" width="500" height="550"/>
+<img src="/docs/architecture.jpg" width="550" height="700"/>
 
 ### Requirements
 * go version 1.15+
