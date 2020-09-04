@@ -1,6 +1,6 @@
 ## Porter 
 
-<img src="/docs/logo.jpg" width="100" height="100"/>
+<img src="/docs/logo.png" width="100" height="100"/>
 
 Porter is a distributed MySQL binlog syncer based on raft. Porter can act as a slave to the real master. 
 Porter has the following key featues:
