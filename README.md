@@ -1,5 +1,6 @@
 ## Porter 
-![](docs/logo.png)
+
+<img src="/docs/logo.jpg" width="100" height="100"/>
 
 Porter is a distributed MySQL binlog syncer based on raft. Porter can act as a slave to the real master. 
 Porter has the following key featues:
@@ -8,7 +9,8 @@ Porter has the following key featues:
 and the order of binlog event is exactly the the same as that on the master
 
 ### Overview
-![](docs/architecture.jpg)
+
+<img src="/docs/architecture.jpg" width="500" height="550"/>
 
 ### Requirements
 * go version 1.15+
