@@ -31,7 +31,7 @@ func newRaftNode(rnc config.RaftNodeConfig) {
 	go rc.startRaft()
 }
 
-func newRaftNodeTest(id int, peers []string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan string,
+func NewRaftNodeTest(id int, peers []string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan string,
 	confChangeC <-chan raftpb.ConfChange) (<-chan *string, <-chan error, <-chan *snap.Snapshotter) {
 
 	commitC := make(chan *string)

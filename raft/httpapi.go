@@ -72,7 +72,7 @@ func (h *httpKVAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // serverHttpKVAPI starts a key-value server with a GET/PUT API and listeners
-func serveHttpKVAPI(kv *storage.KvStore, port int, confChangeC chan<- raftpb.ConfChange, errorC <-chan error) {
+func ServeHttpKVAPI(kv *storage.KvStore, port int, confChangeC chan<- raftpb.ConfChange, errorC <-chan error) {
 	srv := http.Server{
 		Addr: ":" + strconv.Itoa(port),
 		Handler: &httpKVAPI{

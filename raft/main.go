@@ -4,6 +4,7 @@ import (
 	"flag"
 	"github.com/coreos/etcd/raft/raftpb"
 	"porter/storage"
+	"porter/syncer"
 	"strings"
 )
 
@@ -23,8 +24,10 @@ func main() {
 	getSnapshot := func() ([]byte, error) {
 		return kvs.GetSnapshot()
 	}
-	commitC, errorC, snapshotters := newRaftNodeTest(*id, strings.Split(*cluster, ","), *join, getSnapshot, proposeC, confChangeC)
+	commitC, errorC, snapshotters := NewRaftNodeTest(*id, strings.Split(*cluster, ","), *join, getSnapshot, proposeC, confChangeC)
 
 	kvs = storage.NewKVStore(<-snapshotters, proposeC, commitC, errorC)
-	serveHttpKVAPI(kvs, *kvport, confChangeC, errorC)
+	ServeHttpKVAPI(kvs, *kvport, confChangeC, errorC)
+	syncer.Test()
+
 }

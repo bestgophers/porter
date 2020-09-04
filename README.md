@@ -1,14 +1,12 @@
-## Porter 
-
+## Porter
 <img src="/docs/logo.png" width="100" height="100"/>
-
+ 
+### Overview
 Porter is a distributed MySQL binlog syncer based on raft. Porter can act as a slave to the real master. 
 Porter has the following key featues:
 * MySQL replication protocol compatibility,pull the binlog files from the Mysql master through gtid mode.
 * High available ,porter uses Raft to support High available,The binlog data written to the porter cluster is guaranteed to be consistent between multiple nodes,
 and the order of binlog event is exactly the the same as that on the master
-
-### Overview
 
 <img src="/docs/architecture.jpg" width="550" height="700"/>
 
