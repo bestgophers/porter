@@ -36,7 +36,4 @@ SOFTWARE.
 ```
 
 ### Acknowledgments
-* Thanks [etcd](https://github.com/etcd-io/etcd) for providing raft library.
-* Thanks [go-mysql](https://github.com/siddontang/go-mysql) for providing mysql replication protocol parser.
-* Thanks [kingbus](https://github.com/flike/kingbus) for providing ideas.
 * Thanks [misselvexu](https://github.com/misselvexu) give me support and enough free to complete it.
