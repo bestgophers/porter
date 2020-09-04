@@ -1,6 +1,6 @@
 package syncer
 
-type Processor struct {
+type RowData struct {
 	Action string
 	Schema string
 	Table  string

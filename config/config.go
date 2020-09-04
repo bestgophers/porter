@@ -59,6 +59,7 @@ type RaftNodeConfig struct {
 	Join        bool     `toml:"raft_join"`     // node is joining an existing cluster
 	Waldir      string   `toml:"raft_wal_dir"`  // path to WAL directory
 	Snapdir     string   `toml:"raft_snap_dir"` // path to snapshot directory
+	Port        int      `toml:raft_port`
 	GetSnapshot func() ([]byte, error)
 	LastIndex   uint64 // index of log at start
 

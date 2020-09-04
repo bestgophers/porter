@@ -97,7 +97,7 @@ func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
 
 // assemblyRows assembly data.
 func (s *Server) assembly(rule *syncer.Rule, action string, rows [][]interface{}) error {
-	datas := make([]*syncer.Processor, 0, len(rows))
+	datas := make([]*syncer.RowData, 0, len(rows))
 
 	for _, values := range rows {
 		pd, err := s.makeProcessorData(rule, values)
@@ -106,7 +106,7 @@ func (s *Server) assembly(rule *syncer.Rule, action string, rows [][]interface{}
 			return errors.Errorf("assembly data error, err:%s", err)
 		}
 
-		data := &syncer.Processor{
+		data := &syncer.RowData{
 			Action: action,
 			Schema: rule.Schema,
 			Table:  rule.Table,

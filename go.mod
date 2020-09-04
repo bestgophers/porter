@@ -25,6 +25,7 @@ require (
 	github.com/pingcap/kvproto v0.0.0-20200828054126-d677e6fd224a // indirect
 	github.com/pingcap/tidb v2.0.11+incompatible // indirect
 	github.com/prometheus/common v0.4.0
+	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726
 	github.com/siddontang/go-log v0.0.0-20180807004314-8d05993dda07

@@ -3,10 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/pingcap/errors"
 	"github.com/prometheus/common/log"
 	"github.com/siddontang/go-mysql/canal"
 	"porter/config"
+	pr "porter/raft"
+	"porter/storage"
 	"porter/syncer"
 	"regexp"
 	"strings"
@@ -40,6 +43,11 @@ func NewServer(config *config.PorterConfig) (*Server, error) {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	var err error
+
+	if err = s.startRaftNode(); err != nil {
+		return nil, errors.Trace(err)
+	}
+
 	if s.master, err = loadMasterInfo(config.LogDir); err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -61,6 +69,25 @@ func NewServer(config *config.PorterConfig) (*Server, error) {
 	}
 
 	return s, nil
+}
+
+func (s *Server) startRaftNode() error {
+	proposeC := make(chan string)
+	defer close(proposeC)
+	confChangeC := make(chan raftpb.ConfChange)
+	defer close(confChangeC)
+
+	var kvs *storage.KvStore
+	getSnapshot := func() ([]byte, error) {
+		return kvs.GetSnapshot()
+	}
+
+	commitC, errorC, snapshotters := pr.NewRaftNode(s.config.RaftNodeConfig, getSnapshot, proposeC, confChangeC)
+	//commitC, errorC, snapshotters := pr.NewRaftNode(*id, strings.Split(*cluster, ","), *join, getSnapshot, proposeC, confChangeC)
+	kvs = storage.NewKVStore(<-snapshotters, proposeC, commitC, errorC)
+	pr.ServeHttpKVAPI(kvs, s.config.RaftNodeConfig.Port, confChangeC, errorC)
+
+	return nil
 }
 
 func (s *Server) newCanal() error {
