@@ -6,9 +6,15 @@ Porter has the following key featues:
 * MySQL replication protocol compatibility,pull the binlog files from the Mysql master through gtid mode.
 * High available ,porter uses Raft to support High available,The binlog data written to the porter cluster is guaranteed to be consistent between multiple nodes,
 and the order of binlog event is exactly the the same as that on the master
+
 ### Overview
+![](docs/architecture.jpg)
 
 ### Requirements
+* go version 1.15+
+```
+go version
+```
 
 ### Quick Start
 
