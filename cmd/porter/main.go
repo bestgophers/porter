@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"porter/config"
+	"porter/log"
 	"porter/server"
 	"syscall"
 )
@@ -47,6 +48,10 @@ func main() {
 		fmt.Printf("NewPorterConfig error, err:%s\n", err.Error())
 		return
 	}
+
+	// init log
+	log.NewLogger(porterConfig.LogDir, porterConfig.LogLevel)
+	defer log.StopLoggers()
 
 	// start
 	s, err := server.NewServer(porterConfig)

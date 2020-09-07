@@ -33,7 +33,7 @@ func CallerEncoder(caller zapcore.EntryCaller, enc zapcore.PrimitiveArrayEncoder
 }
 
 // InitLogger initializer the log.
-func InitLogger(logDir string, logLevel string) {
+func NewLogger(logDir string, logLevel string) {
 	var level zapcore.Level
 
 	if logDir == "" {
@@ -72,7 +72,7 @@ func InitLogger(logDir string, logLevel string) {
 	Log = Logger.Sugar()
 }
 
-func UnInitLoggers() {
+func StopLoggers() {
 	err := Log.Sync()
 	if err != nil {
 		panic(err)
