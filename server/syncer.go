@@ -3,13 +3,16 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/labstack/echo"
 	"github.com/pingcap/errors"
 	"github.com/siddontang/go-log/log"
 	"github.com/siddontang/go-mysql/canal"
 	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-mysql/replication"
 	"github.com/siddontang/go-mysql/schema"
+	"net/http"
 	"porter/syncer"
+	"porter/utils"
 	"reflect"
 	"strings"
 	"time"
@@ -21,6 +24,92 @@ const (
 )
 
 const mysqlDateFormat = "2016-01-02"
+
+const (
+	PREPARE = iota
+	NEW
+	RUNNING
+	STOP
+)
+
+type Syncer struct {
+	meta map[uint32]int
+}
+
+// AllSyncers returns all syncers status.
+func (s *Syncer) AllSyncers(echoCtx echo.Context) error {
+	return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(s.meta))
+}
+
+// PrepareCancel pre initialization canal.
+func (s *Server) PrepareCanal() error {
+	var db string
+	dbs := map[string]struct{}{}
+	tables := make([]string, 0, len(s.rules))
+	for _, rule := range s.rules {
+		db = rule.Schema
+		dbs[rule.Schema] = struct{}{}
+		tables = append(tables, rule.Table)
+	}
+
+	if len(db) == 1 {
+		// one db, we can shrink using table
+		s.canal.AddDumpTables(db, tables...)
+	} else {
+		// many dbs, can only assign databases to dumo
+		keys := make([]string, 0, len(dbs))
+		for key := range dbs {
+			keys = append(keys, key)
+		}
+		s.canal.AddDumpDatabases(keys...)
+	}
+
+	s.canal.SetEventHandler(&eventHandler{s: s})
+	m := s.Syncer.meta
+	m[s.config.SyncerConfig.ServerID] = PREPARE
+
+	return nil
+}
+
+// NewCancel creates a canal ready to start.
+func (s *Server) NewCanal() error {
+	cfg := canal.NewDefaultConfig()
+	cfg.Addr = s.config.SyncerConfig.MysqlAddr
+	cfg.User = s.config.SyncerConfig.MysqlUser
+	cfg.Password = s.config.SyncerConfig.MysqlPassword
+	cfg.Charset = s.config.SyncerConfig.MysqlCharset
+	cfg.Flavor = s.config.SyncerConfig.Flavor
+
+	cfg.ServerID = s.config.SyncerConfig.ServerID
+	cfg.Dump.ExecutionPath = s.config.SyncerConfig.DumpExec
+	cfg.Dump.DiscardErr = false
+	cfg.Dump.SkipMasterData = s.config.SyncerConfig.SkipMasterData
+
+	for _, s := range s.config.Sources {
+		for _, t := range s.Tables {
+			cfg.IncludeTableRegex = append(cfg.IncludeTableRegex, s.Schema+"\\."+t)
+		}
+	}
+
+	var err error
+	s.canal, err = canal.NewCanal(cfg)
+	return errors.Trace(err)
+}
+
+// StopCancel stop a canal.
+func (s *Server) StopCanal() {
+	s.canal.Close()
+}
+
+// ResetCancel reset a canal, unavailable until reset is complete
+func (s *Syncer) ResetCanal(echoCtx echo.Context) error {
+
+}
+
+// RemoveCanal stop a canal and remove corresponding meta.
+func (s *Syncer) RemoveCanal(echoCtx echo.Context) error {
+
+}
 
 type posSaver struct {
 	pos   mysql.Position

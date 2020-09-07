@@ -21,19 +21,19 @@ const (
 	LogMaxAge = 28 //days
 )
 
-// Log is global var of log
+//Log is a global var of log
 var Log *zap.SugaredLogger
 
-// Logger is global var of zap log
+//Logger is a global var of zap log
 var Logger *zap.Logger
 
+// CallerEncoder will add caller to log. format is "filename:lineNum:", e.g:"zaplog/zaplog_test.go:15"
 func CallerEncoder(caller zapcore.EntryCaller, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(strings.Join([]string{caller.TrimmedPath()}, ":"))
-
 }
 
-// InitLogger initializer the log.
-func NewLogger(logDir string, logLevel string) {
+// InitLoggers the global logger.
+func InitLoggers(logDir string, logLevel string) {
 	var level zapcore.Level
 
 	if logDir == "" {
@@ -47,50 +47,58 @@ func NewLogger(logDir string, logLevel string) {
 
 	err := level.Set(logLevel)
 	if err != nil {
-		panic("set log level error,err: " + err.Error())
+		panic("set log level error,err:" + err.Error())
 	}
 
 	writer := lumberjack.Logger{
 		Filename:   logFileName,
-		MaxSize:    LogFileMaxSize,
-		MaxAge:     LogMaxAge,
+		MaxSize:    LogFileMaxSize, // megabytes
 		MaxBackups: LogMaxBackups,
+		MaxAge:     LogMaxAge, // days
 		LocalTime:  true,
 	}
 	err = writer.Rotate()
 	if err != nil {
-		panic("writer rotate error,err: " + err.Error())
+		panic("writer rotate error,err:" + err.Error())
 	}
+
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(loggerConfig.EncoderConfig),
 		zapcore.AddSync(&writer),
 		level,
 	)
 
-	Logger := zap.New(core, zap.Option(zap.AddCaller()))
+	Logger = zap.New(core,
+		zap.Option(zap.AddCaller()),
+	)
 	zap.RedirectStdLog(Logger)
+	//defer undo()
 	Log = Logger.Sugar()
 }
 
-func StopLoggers() {
+//UnInitLoggers implements sync log before quit
+func UnInitLoggers() {
 	err := Log.Sync()
 	if err != nil {
 		panic(err)
 	}
 }
 
+//Writer is a interface of the web framework:echo log writer
 type Writer struct {
 	LogFunc func(msg string, fields ...zapcore.Field)
 }
 
+//NewWriter create a Writer
 func NewWriter() *Writer {
 	return &Writer{LogFunc: Logger.WithOptions(
 		zap.AddCallerSkip(2 + 2),
 	).Info}
 }
 
-func (w *Writer) Writer(p []byte) (int, error) {
-	w.LogFunc(bytesToString(p))
+//Write implements the Write interface
+func (l *Writer) Write(p []byte) (int, error) {
+	l.LogFunc(bytesToString(p))
 	return len(p), nil
 }
 

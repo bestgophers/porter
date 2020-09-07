@@ -20,6 +20,7 @@ import (
 var ErrRuleNotExist = errors.New("rule is not exist")
 
 type Server struct {
+	Syncer
 	config *config.PorterConfig
 	canal  *canal.Canal
 	rules  map[string]*syncer.Rule
@@ -52,7 +53,7 @@ func NewServer(config *config.PorterConfig) (*Server, error) {
 		return nil, errors.Trace(err)
 	}
 
-	if err = s.newCanal(); err != nil {
+	if err = s.NewCanal(); err != nil {
 		return nil, errors.Trace(err)
 	}
 
@@ -60,7 +61,7 @@ func NewServer(config *config.PorterConfig) (*Server, error) {
 		return nil, errors.Trace(err)
 	}
 
-	if err = s.prepareCanal(); err != nil {
+	if err = s.PrepareCanal(); err != nil {
 		return nil, errors.Trace(err)
 	}
 
@@ -87,55 +88,6 @@ func (s *Server) startRaftNode() error {
 	kvs = storage.NewKVStore(<-snapshotters, proposeC, commitC, errorC)
 	pr.ServeHttpKVAPI(kvs, s.config.RaftNodeConfig.Port, confChangeC, errorC)
 
-	return nil
-}
-
-func (s *Server) newCanal() error {
-	cfg := canal.NewDefaultConfig()
-	cfg.Addr = s.config.SyncerConfig.MysqlAddr
-	cfg.User = s.config.SyncerConfig.MysqlUser
-	cfg.Password = s.config.SyncerConfig.MysqlPassword
-	cfg.Charset = s.config.SyncerConfig.MysqlCharset
-	cfg.Flavor = s.config.SyncerConfig.Flavor
-
-	cfg.ServerID = s.config.SyncerConfig.ServerID
-	cfg.Dump.ExecutionPath = s.config.SyncerConfig.DumpExec
-	cfg.Dump.DiscardErr = false
-	cfg.Dump.SkipMasterData = s.config.SyncerConfig.SkipMasterData
-
-	for _, s := range s.config.Sources {
-		for _, t := range s.Tables {
-			cfg.IncludeTableRegex = append(cfg.IncludeTableRegex, s.Schema+"\\."+t)
-		}
-	}
-
-	var err error
-	s.canal, err = canal.NewCanal(cfg)
-	return errors.Trace(err)
-}
-
-func (s *Server) prepareCanal() error {
-	var db string
-	dbs := map[string]struct{}{}
-	tables := make([]string, 0, len(s.rules))
-	for _, rule := range s.rules {
-		db = rule.Schema
-		dbs[rule.Schema] = struct{}{}
-		tables = append(tables, rule.Table)
-	}
-
-	if len(db) == 1 {
-		// one db, we can shrink using table
-		s.canal.AddDumpTables(db, tables...)
-	} else {
-		// many dbs, can only assign databases to dumo
-		keys := make([]string, 0, len(dbs))
-		for key := range dbs {
-			keys = append(keys, key)
-		}
-		s.canal.AddDumpDatabases(keys...)
-	}
-	s.canal.SetEventHandler(&eventHandler{s: s})
 	return nil
 }
 
