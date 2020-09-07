@@ -4,7 +4,7 @@ mysql_addr = "127.0.0.1:3306"
 mysql_user = "root"
 mysql_pass = "yaoyichen52"
 mysql_charset = "utf8"
-
+mysql_position = ""
 # Path to store data, like master.info, if not set or empty,
 # we must use this to support breakpoint resume syncing.
 # TODO: support other storage, like etcd.

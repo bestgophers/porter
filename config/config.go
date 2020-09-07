@@ -34,6 +34,7 @@ type SyncerConfig struct {
 	MysqlUser     string `toml:"mysql_user"`
 	MysqlPassword string `toml:"mysql_pass"`
 	MysqlCharset  string `toml:"mysql_charset"`
+	MysqlPosition int    `toml:mysql_position`
 
 	ServerID uint32 `toml:"server_id"`
 	Flavor   string `toml:"flavor"`

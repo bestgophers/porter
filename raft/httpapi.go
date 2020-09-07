@@ -1,4 +1,4 @@
-package main
+package raft
 
 import (
 	"github.com/coreos/etcd/raft/raftpb"
