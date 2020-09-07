@@ -82,8 +82,8 @@ func (s *Server) startRaftNode() error {
 		return kvs.GetSnapshot()
 	}
 
-	commitC, errorC, snapshotters := pr.NewRaftNode(s.config.RaftNodeConfig, getSnapshot, proposeC, confChangeC)
-	//commitC, errorC, snapshotters := pr.NewRaftNode(*id, strings.Split(*cluster, ","), *join, getSnapshot, proposeC, confChangeC)
+	commitC, errorC, snapshotters := pr.NewRaftNode(&s.config.RaftNodeConfig, getSnapshot, proposeC, confChangeC)
+
 	kvs = storage.NewKVStore(<-snapshotters, proposeC, commitC, errorC)
 	pr.ServeHttpKVAPI(kvs, s.config.RaftNodeConfig.Port, confChangeC, errorC)
 

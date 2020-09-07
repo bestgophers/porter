@@ -2,7 +2,6 @@ package raft
 
 import (
 	"context"
-	"fmt"
 	"github.com/coreos/etcd/etcdserver/stats"
 	"github.com/coreos/etcd/pkg/fileutil"
 	"github.com/coreos/etcd/pkg/types"
@@ -25,74 +24,23 @@ type RaftNode struct {
 	config.RaftNodeConfig
 }
 
-//func NewRaftNode(rnc config.RaftNodeConfig) *RaftNode{
-//	rc := &RaftNode{rnc}
-//
-//	go rc.startRaft()
-//	return rc
-//}
-
-func NewRaftNode(rnc config.RaftNodeConfig, getSnapshot func() ([]byte, error), proposeC <-chan string,
+func NewRaftNode(rnc *config.RaftNodeConfig, getSnapshot func() ([]byte, error), proposeC <-chan string,
 	confChangeC <-chan raftpb.ConfChange) (<-chan *string, <-chan error, <-chan *snap.Snapshotter) {
 
 	commitC := make(chan *string)
 	errorC := make(chan error)
 
-	rc := &config.RaftNodeConfig{
-		ProposeC:    proposeC,
-		ConfChangeC: confChangeC,
-		CommitC:     commitC,
-		ErrorC:      errorC,
-		Id:          rnc.Id,
-		Peers:       rnc.Peers,
-		Join:        rnc.Join,
-		Waldir:      fmt.Sprintf("raftexample-%d", rnc.Id),
-		Snapdir:     fmt.Sprintf("raftexample-%d-snap", rnc.Id),
-		GetSnapshot: getSnapshot,
-		SnapCount:   10000,
-		Stopc:       make(chan struct{}),
-		Httpstopc:   make(chan struct{}),
-		Httpdonec:   make(chan struct{}),
+	rnc.ProposeC = proposeC
+	rnc.ConfChangeC = confChangeC
+	rnc.CommitC = commitC
+	rnc.ErrorC = errorC
+	rnc.GetSnapshot = getSnapshot
 
-		SnapshotterReady: make(chan *snap.Snapshotter, 1),
-		// rest of structure populated after WAL replay
-	}
-	node := RaftNode{*rc}
+	node := RaftNode{*rnc}
 
 	go node.startRaft()
-	return commitC, errorC, rc.SnapshotterReady
+	return commitC, errorC, rnc.SnapshotterReady
 }
-
-//func NewRaftNode(id int, peers []string, join bool, getSnapshot func() ([]byte, error), proposeC <-chan string,
-//	confChangeC <-chan raftpb.ConfChange) (<-chan *string, <-chan error, <-chan *snap.Snapshotter) {
-//
-//	commitC := make(chan *string)
-//	errorC := make(chan error)
-//
-//	rc := &config.RaftNodeConfig{
-//		ProposeC:    proposeC,
-//		ConfChangeC: confChangeC,
-//		CommitC:     commitC,
-//		ErrorC:      errorC,
-//		Id:          id,
-//		Peers:       peers,
-//		Join:        join,
-//		Waldir:      fmt.Sprintf("raftexample-%d", id),
-//		Snapdir:     fmt.Sprintf("raftexample-%d-snap", id),
-//		GetSnapshot: getSnapshot,
-//		SnapCount:   10000,
-//		Stopc:       make(chan struct{}),
-//		Httpstopc:   make(chan struct{}),
-//		Httpdonec:   make(chan struct{}),
-//
-//		SnapshotterReady: make(chan *snap.Snapshotter, 1),
-//		// rest of structure populated after WAL replay
-//	}
-//	node := RaftNode{*rc}
-//
-//	go node.startRaft()
-//	return commitC, errorC, rc.SnapshotterReady
-//}
 
 func (rc *RaftNode) saveSnap(snap raftpb.Snapshot) error {
 	walSnap := walpb.Snapshot{

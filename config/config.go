@@ -11,7 +11,6 @@ import (
 	"github.com/coreos/etcd/wal"
 	"github.com/juju/errors"
 	"io/ioutil"
-	"porter/storage"
 	"porter/syncer"
 )
 
@@ -20,9 +19,9 @@ type PorterConfig struct {
 	SyncerConfig
 
 	AdminURLs   types.URLs
-	MetricsAddr string
-	LogDir      string
-	LogLevel    string
+	MetricsAddr string `toml:"stat_adr"`
+	LogDir      string `toml:"log_dir"`
+	LogLevel    string `toml:"log_level""`
 }
 
 type SourceConfig struct {
@@ -55,12 +54,13 @@ type RaftNodeConfig struct {
 	CommitC     chan<- *string           // entries committed to log (k,v)
 	ErrorC      chan<- error             // errors from raft session
 
-	Id          int      `toml:"raft_id"`       // cluster ID for raft session
-	Peers       []string `toml:"raft_cluster"`  // raft peer URLs
-	Join        bool     `toml:"raft_join"`     // node is joining an existing cluster
-	Waldir      string   `toml:"raft_wal_dir"`  // path to WAL directory
-	Snapdir     string   `toml:"raft_snap_dir"` // path to snapshot directory
-	Port        int      `toml:raft_port`
+	Id      int      `toml:"raft_id"`       // cluster ID for raft session
+	Peers   []string `toml:"raft_cluster"`  // raft peer URLs
+	Join    bool     `toml:"raft_join"`     // node is joining an existing cluster
+	Waldir  string   `toml:"raft_wal_dir"`  // path to WAL directory
+	Snapdir string   `toml:"raft_snap_dir"` // path to snapshot directory
+	Port    int      `toml:"raft_port"`
+
 	GetSnapshot func() ([]byte, error)
 	LastIndex   uint64 // index of log at start
 
@@ -105,35 +105,18 @@ func NewConfig(data string) (*PorterConfig, error) {
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
-	rnc, err := getRaftNodeConfig(&cfg)
-	if err != nil {
-		return nil, errors.Trace(err)
-	}
-	cfg.RaftNodeConfig = *rnc
+
+	cfg.buildRafeNodeConfig()
 
 	return &cfg, nil
 }
 
-func getRaftNodeConfig(cfg *PorterConfig) (*RaftNodeConfig, error) {
-	var kvs *storage.KvStore
-	rc := &RaftNodeConfig{
-		ProposeC:    make(chan string),
-		ConfChangeC: make(chan raftpb.ConfChange),
-		CommitC:     make(chan *string),
-		ErrorC:      make(chan error),
-		Id:          cfg.RaftNodeConfig.Id,
-		Peers:       cfg.RaftNodeConfig.Peers,
-		Join:        cfg.RaftNodeConfig.Join,
-		Waldir:      fmt.Sprintf(cfg.RaftNodeConfig.Waldir+"-%d", cfg.RaftNodeConfig.Id),
-		Snapdir:     fmt.Sprintf(cfg.RaftNodeConfig.Snapdir+"-%d", cfg.RaftNodeConfig.Id),
-		GetSnapshot: func() ([]byte, error) {
-			return kvs.GetSnapshot()
-		},
-		SnapCount:        10000,
-		Stopc:            make(chan struct{}),
-		Httpstopc:        make(chan struct{}),
-		Httpdonec:        make(chan struct{}),
-		SnapshotterReady: make(chan *snap.Snapshotter, 1),
-	}
-	return rc, nil
+func (cfg *PorterConfig) buildRafeNodeConfig() {
+	cfg.RaftNodeConfig.Waldir = fmt.Sprintf(cfg.RaftNodeConfig.Waldir+"-%d", cfg.RaftNodeConfig.Id)
+	cfg.RaftNodeConfig.Snapdir = fmt.Sprintf(cfg.RaftNodeConfig.Snapdir+"-%d", cfg.RaftNodeConfig.Id)
+	cfg.RaftNodeConfig.SnapCount = 10000
+	cfg.RaftNodeConfig.Stopc = make(chan struct{})
+	cfg.RaftNodeConfig.Httpstopc = make(chan struct{})
+	cfg.RaftNodeConfig.Httpdonec = make(chan struct{})
+	cfg.RaftNodeConfig.SnapshotterReady = make(chan *snap.Snapshotter, 1)
 }
