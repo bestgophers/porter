@@ -15,7 +15,7 @@ const (
 type AdminServer struct {
 	AdminAddr string
 	web       *echo.Echo
-	sy        *Syncer
+	sy        *Server
 }
 
 type ApiServer interface {
@@ -60,10 +60,10 @@ func (s *AdminServer) RegisterMiddleware() {
 
 func (s *AdminServer) RegisterURL() {
 	s.web.GET("/allSyncers", s.sy.AllSyncers)
-	s.web.POST("/addSyncer", nil)
+	s.web.POST("/addSyncer", s.sy.AddCanal)
 	s.web.PUT("/updateSyncer", s.sy.ResetCanal)
 	s.web.GET("/removeSyncer", s.sy.RemoveCanal)
-	s.web.GET("/stopServer", nil)
+	s.web.GET("/stopServer", s.sy.StopCanal)
 }
 
 func (s *AdminServer) Stop() {

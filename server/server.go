@@ -20,12 +20,12 @@ import (
 var ErrRuleNotExist = errors.New("rule is not exist")
 
 type Server struct {
-	Syncer
-	config *config.PorterConfig
-	canal  *canal.Canal
-	rules  map[string]*syncer.Rule
-	ctx    context.Context
-	cancel context.CancelFunc
+	syncerMeta map[uint32]int
+	config     *config.PorterConfig
+	canal      *canal.Canal
+	rules      map[string]*syncer.Rule
+	ctx        context.Context
+	cancel     context.CancelFunc
 
 	wg sync.WaitGroup
 

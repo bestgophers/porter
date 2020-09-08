@@ -32,13 +32,49 @@ const (
 	STOP
 )
 
-type Syncer struct {
-	meta map[uint32]int
+// AllSyncers returns all syncers status.
+func (s *Server) AllSyncers(echoCtx echo.Context) error {
+	return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(s.syncerMeta))
 }
 
-// AllSyncers returns all syncers status.
-func (s *Syncer) AllSyncers(echoCtx echo.Context) error {
-	return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(s.meta))
+// AddCanal add a canal and start it.
+func (s *Server) AddCanal(echoCtx echo.Context) error {
+	return nil
+}
+
+// StopCancel stop a canal.
+func (s *Server) StopCanal(echoCtx echo.Context) error {
+	arg := struct {
+		SyncerId string `json:"syncer_id"`
+	}{}
+
+	err := echoCtx.Bind(&arg)
+	if err != nil {
+		return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
+	}
+
+	req, err := json.Marshal(arg)
+
+	if req != nil {
+
+	}
+
+	if err != nil {
+		return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
+	}
+
+	s.canal.Close()
+	return echoCtx.JSON(http.StatusOK, utils.NewResp())
+}
+
+// ResetCancel reset a canal, unavailable until reset is complete
+func (s *Server) ResetCanal(echoCtx echo.Context) error {
+	return nil
+}
+
+// RemoveCanal stop a canal and remove corresponding meta.
+func (s *Server) RemoveCanal(echoCtx echo.Context) error {
+	return nil
 }
 
 // PrepareCancel pre initialization canal.
@@ -65,7 +101,8 @@ func (s *Server) PrepareCanal() error {
 	}
 
 	s.canal.SetEventHandler(&eventHandler{s: s})
-	m := s.Syncer.meta
+
+	m := s.syncerMeta
 	m[s.config.SyncerConfig.ServerID] = PREPARE
 
 	return nil
@@ -94,21 +131,6 @@ func (s *Server) NewCanal() error {
 	var err error
 	s.canal, err = canal.NewCanal(cfg)
 	return errors.Trace(err)
-}
-
-// StopCancel stop a canal.
-func (s *Server) StopCanal() {
-	s.canal.Close()
-}
-
-// ResetCancel reset a canal, unavailable until reset is complete
-func (s *Syncer) ResetCanal(echoCtx echo.Context) error {
-
-}
-
-// RemoveCanal stop a canal and remove corresponding meta.
-func (s *Syncer) RemoveCanal(echoCtx echo.Context) error {
-
 }
 
 type posSaver struct {
