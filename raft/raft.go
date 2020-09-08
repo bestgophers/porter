@@ -42,6 +42,15 @@ func NewRaftNode(rnc *config.RaftNodeConfig, getSnapshot func() ([]byte, error),
 	return commitC, errorC, rnc.SnapshotterReady
 }
 
+const STATE_LEADER = "StateLeader"
+
+func (r *RaftNode) IsLeader() bool {
+	if r.Node.Status().RaftState.String() != STATE_LEADER {
+		return false
+	}
+	return true
+}
+
 func (rc *RaftNode) saveSnap(snap raftpb.Snapshot) error {
 	walSnap := walpb.Snapshot{
 		Index: snap.Metadata.Index,

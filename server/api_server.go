@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
+	"porter/api"
 	"porter/log"
 	"time"
 )
@@ -16,6 +17,7 @@ type AdminServer struct {
 	AdminAddr string
 	web       *echo.Echo
 	sy        *Server
+	bs        *api.BinlogSyncerHandler
 }
 
 type ApiServer interface {
@@ -59,11 +61,10 @@ func (s *AdminServer) RegisterMiddleware() {
 }
 
 func (s *AdminServer) RegisterURL() {
-	s.web.GET("/allSyncers", s.sy.AllSyncers)
-	s.web.POST("/addSyncer", s.sy.AddCanal)
-	s.web.PUT("/updateSyncer", s.sy.ResetCanal)
-	s.web.GET("/removeSyncer", s.sy.RemoveCanal)
-	s.web.GET("/stopServer", s.sy.StopCanal)
+	s.web.GET("/syncers", s.bs.GetBinlogSyncersStatus)
+	s.web.POST("/startSyncer", s.bs.StartBinlogSyncer)
+	s.web.PUT("/updateSyncer", s.bs.UpdateBinlogSyncerConfig)
+	s.web.GET("/stopSyncer", s.bs.StopBinlogSyncer)
 }
 
 func (s *AdminServer) Stop() {
