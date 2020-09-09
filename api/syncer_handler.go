@@ -143,41 +143,46 @@ func (h *BinlogSyncerHandler) UpdateBinlogSyncerConfig(echoCtx echo.Context) err
 	return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(args.ServerID))
 }
 
-// sendToLeander implements forward request to leader in raft cluster
-func (h *BinlogSyncerHandler) sendToLeader(method, uri string, req []byte) (*utils.Resp, error) {
-	//
-	//leaderId := h.svr.Leader()
-	//leader := h.cluster.Member(leaderId)
-	//if leader == nil {
-	//	return nil, ErrNoLeader
-	//}
-	//
-	//if len(leader.AdminURLs) != 1 {
-	//	log.Log.Errorf("leader admin url is not 1,leader:%v", *leader)
-	//	return nil, ErrNoLeader
-	//}
-	//leaderURL, err := url.Parse(leader.AdminURLs[0])
-	//if err != nil {
-	//	return nil, err
-	//}
-	//reqURL := leaderURL.Scheme + "://" + leaderURL.Host + uri
-	//
-	//log.Log.Debugf("sendToLeader: reqURL is:%s", req)
-	//
-	//resp, err := utils.SendRequest(method, reqURL, req)
-	//if err != nil {
-	//	log.Log.Errorf("sendToLeander: SendRequest error,err:%s,url:%s", err, reqURL)
-	//	return nil, err
-	//}
-	//return resp, nil
-	return nil, nil
+// IsLeader returns determine whether the current node is leader
+func (h *BinlogSyncerHandler) IsLeader(echoCtx echo.Context) error {
+	leader := h.svr.IsLeader()
+	return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(leader))
 }
 
 // leaderAddress variable used for cache leader address last invoke
 var leaderAddress string
 
 // forwardToLeader implements forward request to the leader node
-func (h *BinlogSyncerHandler) forwardToLeader(method, uril string, req []byte) (*utils.Resp, error) {
-	// TODO
+func (h *BinlogSyncerHandler) forwardToLeader(method, url string, req []byte) (*utils.Resp, error) {
+	var found bool
+
+	if len(leaderAddress) > 0 {
+		resp, err := utils.SendRequest("GET", leaderAddress+"/isLeader", nil)
+		if err == nil && resp.Data.(bool) {
+			found = true
+		} else {
+			for _, peer := range h.config.Peers {
+				reqURL := "http://" + peer
+				if reqURL == leaderAddress {
+					continue
+				}
+				resp, err := utils.SendRequest("GET", reqURL+"/isLeader", nil)
+				if err == nil && resp.Data.(bool) {
+					found = true
+					leaderAddress = reqURL
+					break
+				}
+			}
+		}
+	}
+
+	if found {
+		resp, err := utils.SendRequest(method, leaderAddress+url, req)
+		if err != nil {
+			log.Log.Errorf("forwardToLeader: sendRequest error, err: %s", err.Error())
+			return nil, err
+		}
+		return resp, nil
+	}
 	return nil, nil
 }

@@ -6,16 +6,21 @@ import (
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/pingcap/errors"
-	"github.com/prometheus/common/log"
 	"github.com/siddontang/go-mysql/canal"
 	"porter/api"
 	"porter/config"
+	"porter/log"
 	pr "porter/raft"
 	"porter/storage"
 	"porter/syncer"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
+)
+
+const (
+	DialTimeout = 5 * time.Second
 )
 
 // ErrRuleNotExist is the error if rule is not defined.
@@ -238,7 +243,7 @@ func (s *Server) prepareRule(syncerId uint32) error {
 				return errors.Errorf("%s.%s must have a PK for a column", rule.Schema, rule.Table)
 			}
 
-			log.Errorf("ignored table without a primary key : %s\n", rule.TableInfo.Name)
+			log.Log.Errorf("ignored table without a primary key : %s\n", rule.TableInfo.Name)
 		} else {
 			rules[key] = rule
 		}
@@ -266,7 +271,7 @@ func (s *Server) Run() error {
 	for _, sc := range s.config.SyncerConfigs {
 		position := s.master.Position()
 		if err := s.canals[sc.ServerID].RunFrom(position); err != nil {
-			log.Errorf("start canal err %v", err)
+			log.Log.Errorf("start canal err %v", err)
 			return errors.Trace(err)
 		}
 	}
@@ -279,7 +284,7 @@ func (s *Server) Ctx() context.Context {
 }
 
 func (s *Server) Close() {
-	log.Infof("closing porter server")
+	log.Log.Infof("closing porter server")
 	s.cancel()
 	for _, canal := range s.canals {
 		canal.Close()

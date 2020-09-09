@@ -69,6 +69,7 @@ func (s *AdminServer) RegisterURL() {
 	s.web.POST("/startSyncer", s.bs.StartBinlogSyncer)
 	s.web.PUT("/updateSyncer", s.bs.UpdateBinlogSyncerConfig)
 	s.web.GET("/stopSyncer", s.bs.StopBinlogSyncer)
+	s.web.GET("/isLeader", s.bs.IsLeader)
 }
 
 func (s *AdminServer) Stop() {

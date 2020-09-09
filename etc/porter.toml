@@ -5,10 +5,12 @@ mysql_user = "root"
 mysql_pass = "yaoyichen52"
 mysql_charset = "utf8"
 mysql_position = ""
+
 # Path to store data, like master.info, if not set or empty,
 # we must use this to support breakpoint resume syncing.
-# TODO: support other storage, like etcd.
 data_dir = "./var"
+
+admin_url = "127.0.0.1:5000"
 
 log_dir = "./porter-logs"
 log_level = "debug"
@@ -30,12 +32,6 @@ mysqldump = "mysqldump"
 # if we have no privilege to use mysqldump with --master-data,
 # we must skip it.
 #skip_master_data = false
-
-# minimal items to be inserted in one bulk
-bulk_size = 128
-
-# force flush the pending requests if we don't have enough items >= bulk_size
-flush_bulk_time = "200ms"
 
 # Ignore table without primary key
 skip_no_pk_table = false
