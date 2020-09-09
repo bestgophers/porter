@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/pingcap/errors"
 	"github.com/prometheus/common/log"
 	"github.com/siddontang/go-mysql/canal"
+	"porter/api"
 	"porter/config"
 	pr "porter/raft"
 	"porter/storage"
@@ -22,6 +24,7 @@ var ErrRuleNotExist = errors.New("rule is not exist")
 type Server struct {
 	syncerMeta map[uint32]SyncerType
 	config     *config.PorterConfig
+	adminSvr   *api.AdminServer
 	canals     map[uint32]*canal.Canal
 	rules      map[string]*syncer.Rule
 	ctx        context.Context
@@ -46,6 +49,9 @@ func NewServer(config *config.PorterConfig) (*Server, error) {
 	var err error
 
 	if err = s.startRaftNode(); err != nil {
+		return nil, errors.Trace(err)
+	}
+	if err = s.startAdminServer(config.AdminURLs); err != nil {
 		return nil, errors.Trace(err)
 	}
 
@@ -88,6 +94,15 @@ func (s *Server) startRaftNode() error {
 	kvs = storage.NewKVStore(<-snapshotters, proposeC, commitC, errorC)
 	pr.ServeHttpKVAPI(kvs, s.config.RaftNodeConfig.Port, confChangeC, errorC)
 
+	return nil
+}
+
+func (s *Server) startAdminServer(urls types.URLs) error {
+	if len(urls) != 1 {
+		return errors.New("binlog_server:args are not available")
+	}
+	addr := urls[0].Host
+	s.adminSvr = api.NewAdminServer(addr, NewBinlogSyncer(s))
 	return nil
 }
 

@@ -4,18 +4,16 @@ import (
 	"encoding/json"
 	"github.com/labstack/echo"
 	"net/http"
-	"net/url"
 	"porter/config"
 	"porter/log"
-	"porter/syncer"
 	"porter/utils"
 	"sync"
 )
 
 type BinlogSyncerHandler struct {
-	l       sync.Mutex
-	svr     Server
-	cluster Cluster
+	l      sync.Mutex
+	svr    APIServer
+	config config.RaftNodeConfig
 }
 
 // StartBinlogSyncer implements start a binlog syncer
@@ -23,24 +21,7 @@ func (h *BinlogSyncerHandler) StartBinlogSyncer(echoCtx echo.Context) error {
 	h.l.Lock()
 	defer h.l.Unlock()
 
-	args := struct {
-		MysqlAddr     string `json:"mysql_addr"`
-		MysqlUser     string `json:"mysql_user"`
-		MysqlPassword string `json:"mysql_pass"`
-		MysqlCharset  string `json:"mysql_charset"`
-		MysqlPosition int    `json:mysql_position`
-
-		ServerID uint32 `json:"server_id"`
-		Flavor   string `json:"flavor"`
-		DataDir  string `json:"data_dir"`
-
-		DumpExec       string `json:"mysqldump""`
-		SkipMasterData bool   `json:"skip_master_data"`
-
-		Sources       []config.SourceConfig `json:"source"`
-		Rules         []*syncer.Rule        `json:"rule"`
-		SkipNoPkTable bool                  `json:"skip_no_pk_table"`
-	}{}
+	args := config.SyncerHandleConfig{}
 
 	err := echoCtx.Bind(&args)
 	if err != nil {
@@ -52,7 +33,7 @@ func (h *BinlogSyncerHandler) StartBinlogSyncer(echoCtx echo.Context) error {
 		if err != nil {
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
 		}
-		resp, err := h.sendToLeader("PUT", "startSyncer", req)
+		resp, err := h.forwardToLeader("PUT", "startSyncer", req)
 		if err != nil {
 			log.Log.Errorf("StartBinlog:sendToLeader error,err:%s,args:%v", err, args)
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
@@ -75,7 +56,7 @@ func (h *BinlogSyncerHandler) StopBinlogSyncer(echoCtx echo.Context) error {
 	h.l.Lock()
 	defer h.l.Unlock()
 	args := struct {
-		SyncerID int `json:"syncer_id"`
+		SyncerID uint32 `json:"syncer_id"`
 	}{}
 	err := echoCtx.Bind(&args)
 	if err != nil {
@@ -88,7 +69,7 @@ func (h *BinlogSyncerHandler) StopBinlogSyncer(echoCtx echo.Context) error {
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
 		}
 
-		resp, err := h.sendToLeader("PUT", "/stopSyncer", req)
+		resp, err := h.forwardToLeader("PUT", "/stopSyncer", req)
 		if err != nil {
 			log.Log.Errorf("StopBinlogSyncer:sendToLeander error,err:%s,args:%v", err, args)
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
@@ -100,7 +81,7 @@ func (h *BinlogSyncerHandler) StopBinlogSyncer(echoCtx echo.Context) error {
 		return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(resp.Data))
 	}
 
-	h.svr.StopSyncer(&args)
+	h.svr.StopSyncer(args.SyncerID)
 	return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(""))
 }
 
@@ -111,7 +92,7 @@ func (h *BinlogSyncerHandler) GetBinlogSyncersStatus(echoCtx echo.Context) error
 
 	if h.svr.IsLeader() == false {
 
-		resp, err := h.sendToLeader("PUT", "/stopSyncer", nil)
+		resp, err := h.forwardToLeader("PUT", "/stopSyncer", nil)
 		if err != nil {
 			log.Log.Errorf("StopBinlogSyncer:sendToLeander error,err:%s,args:%v", err, nil)
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
@@ -132,24 +113,7 @@ func (h *BinlogSyncerHandler) UpdateBinlogSyncerConfig(echoCtx echo.Context) err
 	h.l.Lock()
 	defer h.l.Unlock()
 
-	args := struct {
-		MysqlAddr     string `json:"mysql_addr"`
-		MysqlUser     string `json:"mysql_user"`
-		MysqlPassword string `json:"mysql_pass"`
-		MysqlCharset  string `json:"mysql_charset"`
-		MysqlPosition int    `json:mysql_position`
-
-		ServerID uint32 `json:"server_id"`
-		Flavor   string `json:"flavor"`
-		DataDir  string `json:"data_dir"`
-
-		DumpExec       string `json:"mysqldump""`
-		SkipMasterData bool   `json:"skip_master_data"`
-
-		Sources       []config.SourceConfig `json:"source"`
-		Rules         []*syncer.Rule        `json:"rule"`
-		SkipNoPkTable bool                  `json:"skip_no_pk_table"`
-	}{}
+	args := config.SyncerHandleConfig{}
 
 	err := echoCtx.Bind(&args)
 	if err != nil {
@@ -161,7 +125,7 @@ func (h *BinlogSyncerHandler) UpdateBinlogSyncerConfig(echoCtx echo.Context) err
 		if err != nil {
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
 		}
-		resp, err := h.sendToLeader("PUT", "startSyncer", req)
+		resp, err := h.forwardToLeader("PUT", "startSyncer", req)
 		if err != nil {
 			log.Log.Errorf("StartBinlog:sendToLeader error,err:%s,args:%v", err, args)
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
@@ -181,28 +145,39 @@ func (h *BinlogSyncerHandler) UpdateBinlogSyncerConfig(echoCtx echo.Context) err
 
 // sendToLeander implements forward request to leader in raft cluster
 func (h *BinlogSyncerHandler) sendToLeader(method, uri string, req []byte) (*utils.Resp, error) {
-	leaderId := h.svr.Leader()
-	leader := h.cluster.Member(leaderId)
-	if leader == nil {
-		return nil, ErrNoLeader
-	}
+	//
+	//leaderId := h.svr.Leader()
+	//leader := h.cluster.Member(leaderId)
+	//if leader == nil {
+	//	return nil, ErrNoLeader
+	//}
+	//
+	//if len(leader.AdminURLs) != 1 {
+	//	log.Log.Errorf("leader admin url is not 1,leader:%v", *leader)
+	//	return nil, ErrNoLeader
+	//}
+	//leaderURL, err := url.Parse(leader.AdminURLs[0])
+	//if err != nil {
+	//	return nil, err
+	//}
+	//reqURL := leaderURL.Scheme + "://" + leaderURL.Host + uri
+	//
+	//log.Log.Debugf("sendToLeader: reqURL is:%s", req)
+	//
+	//resp, err := utils.SendRequest(method, reqURL, req)
+	//if err != nil {
+	//	log.Log.Errorf("sendToLeander: SendRequest error,err:%s,url:%s", err, reqURL)
+	//	return nil, err
+	//}
+	//return resp, nil
+	return nil, nil
+}
 
-	if len(leader.AdminURLs) != 1 {
-		log.Log.Errorf("leader admin url is not 1,leader:%v", *leader)
-		return nil, ErrNoLeader
-	}
-	leaderURL, err := url.Parse(leader.AdminURLs[0])
-	if err != nil {
-		return nil, err
-	}
-	reqURL := leaderURL.Scheme + "://" + leaderURL.Host + uri
+// leaderAddress variable used for cache leader address last invoke
+var leaderAddress string
 
-	log.Log.Debugf("sendToLeader: reqURL is:%s", req)
-
-	resp, err := utils.SendRequest(method, reqURL, req)
-	if err != nil {
-		log.Log.Errorf("sendToLeander: SendRequest error,err:%s,url:%s", err, reqURL)
-		return nil, err
-	}
-	return resp, nil
+// forwardToLeader implements forward request to the leader node
+func (h *BinlogSyncerHandler) forwardToLeader(method, uril string, req []byte) (*utils.Resp, error) {
+	// TODO
+	return nil, nil
 }

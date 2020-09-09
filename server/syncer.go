@@ -45,68 +45,71 @@ func (st SyncerType) String() string {
 	return types[int(st)]
 }
 
-type Syncer struct {
-	Server
+type BinlogSyncer struct {
+	*Server
+}
+
+func NewBinlogSyncer(srv *Server) *BinlogSyncer {
+	return &BinlogSyncer{srv}
 }
 
 // Leader return leader id
-func (s *Syncer) Leader() types.ID {
-	lead := s.config.RaftNodeConfig.Node.Status().Lead
+func (b *BinlogSyncer) Leader() types.ID {
+	lead := b.config.RaftNodeConfig.Node.Status().Lead
 	return types.ID(lead)
 }
 
 // IsLeader determine whether the current node is leader
-func (s *Syncer) IsLeader() bool {
-	leaderId := s.Leader()
-	if types.ID(s.config.RaftNodeConfig.Id) == leaderId {
+func (b *BinlogSyncer) IsLeader() bool {
+	leaderId := b.Leader()
+	if types.ID(b.config.RaftNodeConfig.Id) == leaderId {
 		return true
 	}
 	return false
 }
 
 // StopSyncer implements that stop the specified syncer
-func (s *Syncer) StopSyncer(syncerId uint32) {
-	s.canals[syncerId].Close()
-	s.syncerMeta[syncerId] = STOP
+func (b *BinlogSyncer) StopSyncer(syncerId uint32) {
+	b.canals[syncerId].Close()
+	b.syncerMeta[syncerId] = STOP
 }
 
 // StartSyncer implements that start the syncer
-func (s *Syncer) StartSyncer(cfg *config.SyncerHandleConfig) error {
-
-	if s.syncerMeta[cfg.ServerID] != STOP {
+func (b *BinlogSyncer) StartSyncer(cfg *config.SyncerHandleConfig) error {
+	if b.syncerMeta[cfg.ServerID] != STOP {
 		return ErrStatusStop
 	}
 
-	s.updateSyncerConfig(cfg)
+	b.updateSyncerConfig(cfg)
 
-	s.syncerMeta[cfg.ServerID] = START
-	if err := s.NewCanal(cfg.ServerID); err != nil {
+	b.syncerMeta[cfg.ServerID] = START
+	if err := b.NewCanal(cfg.ServerID); err != nil {
 		log.Log.Errorf("StartSyncer: newCanal error, err: %s", err.Error())
 		return err
 	}
 
-	if err := s.PrepareCanal(cfg.ServerID); err != nil {
+	if err := b.PrepareCanal(cfg.ServerID); err != nil {
 		log.Log.Errorf("StartSyncer: PrepareCanal error, err: %s", err.Error())
 		return err
 	}
 
-	s.syncerMeta[cfg.ServerID] = RUNNING
+	b.syncerMeta[cfg.ServerID] = RUNNING
 	return nil
 }
 
 // UpdateSyncer implements that update the specified syncer and restart
-func (s *Syncer) UpdateSyncer(cfg *config.SyncerHandleConfig) error {
+func (b *BinlogSyncer) UpdateSyncer(cfg *config.SyncerHandleConfig) error {
 	// 1. set status
-	s.syncerMeta[cfg.ServerID] = UPDATE
+	b.syncerMeta[cfg.ServerID] = UPDATE
 
 	// 2. stop specified syncer
-	s.StopSyncer(cfg.ServerID)
+	b.StopSyncer(cfg.ServerID)
 
 	// 3. update config
-	s.updateSyncerConfig(cfg)
+	b.updateSyncerConfig(cfg)
 
 	// 4. start new syncer
-	err := s.StartSyncer(cfg)
+	err := b.StartSyncer(cfg)
 
 	if err != nil {
 		log.Log.Errorf("UpdateSyncer: startSyncer error : err %s", err.Error())
@@ -115,8 +118,13 @@ func (s *Syncer) UpdateSyncer(cfg *config.SyncerHandleConfig) error {
 	return nil
 }
 
+// GetSyncerStatus returns the all syncer configuration and status.
+func (s *BinlogSyncer) GetSyncersStatus() interface{} {
+	return s.syncerMeta
+}
+
 // updateSyncer update syncer config
-func (s *Syncer) updateSyncerConfig(cfg *config.SyncerHandleConfig) {
+func (s *BinlogSyncer) updateSyncerConfig(cfg *config.SyncerHandleConfig) {
 	sc := &config.SyncerConfig{
 		MysqlAddr:      cfg.MysqlAddr,
 		MysqlUser:      cfg.MysqlUser,
@@ -133,11 +141,6 @@ func (s *Syncer) updateSyncerConfig(cfg *config.SyncerHandleConfig) {
 		SkipNoPkTable:  cfg.SkipNoPkTable,
 	}
 	s.config.SyncerConfigs[cfg.ServerID] = sc
-}
-
-// GetSyncerStatus returns the all syncer configuration and status.
-func (s *Syncer) GetSyncersStatus() interface{} {
-	return s.syncerMeta
 }
 
 // PrepareCancel pre initialization canal.
