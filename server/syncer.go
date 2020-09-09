@@ -3,16 +3,15 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/labstack/echo"
+	"github.com/coreos/etcd/pkg/types"
 	"github.com/pingcap/errors"
-	"github.com/siddontang/go-log/log"
 	"github.com/siddontang/go-mysql/canal"
 	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-mysql/replication"
 	"github.com/siddontang/go-mysql/schema"
-	"net/http"
+	"porter/config"
+	"porter/log"
 	"porter/syncer"
-	"porter/utils"
 	"reflect"
 	"strings"
 	"time"
@@ -25,60 +24,124 @@ const (
 
 const mysqlDateFormat = "2016-01-02"
 
+type SyncerType int8
+
 const (
-	PREPARE = iota
-	NEW
+	PREPARE SyncerType = iota
+	START
 	RUNNING
 	STOP
+	UPDATE
 )
 
-// AllSyncers returns all syncers status.
-func (s *Server) AllSyncers(echoCtx echo.Context) error {
-	return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(s.syncerMeta))
+func (st SyncerType) String() string {
+	types := []string{
+		"PREPARE",
+		"START",
+		"RUNNING",
+		"STOP",
+		"UPDATE",
+	}
+	return types[int(st)]
 }
 
-// AddCanal add a canal and start it.
-func (s *Server) AddCanal(echoCtx echo.Context) error {
+type Syncer struct {
+	Server
+}
+
+// Leader return leader id
+func (s *Syncer) Leader() types.ID {
+	lead := s.config.RaftNodeConfig.Node.Status().Lead
+	return types.ID(lead)
+}
+
+// IsLeader determine whether the current node is leader
+func (s *Syncer) IsLeader() bool {
+	leaderId := s.Leader()
+	if types.ID(s.config.RaftNodeConfig.Id) == leaderId {
+		return true
+	}
+	return false
+}
+
+// StopSyncer implements that stop the specified syncer
+func (s *Syncer) StopSyncer(syncerId uint32) {
+	s.canals[syncerId].Close()
+	s.syncerMeta[syncerId] = STOP
+}
+
+// StartSyncer implements that start the syncer
+func (s *Syncer) StartSyncer(cfg *config.SyncerHandleConfig) error {
+
+	if s.syncerMeta[cfg.ServerID] != STOP {
+		return ErrStatusStop
+	}
+
+	s.updateSyncerConfig(cfg)
+
+	s.syncerMeta[cfg.ServerID] = START
+	if err := s.NewCanal(cfg.ServerID); err != nil {
+		log.Log.Errorf("StartSyncer: newCanal error, err: %s", err.Error())
+		return err
+	}
+
+	if err := s.PrepareCanal(cfg.ServerID); err != nil {
+		log.Log.Errorf("StartSyncer: PrepareCanal error, err: %s", err.Error())
+		return err
+	}
+
+	s.syncerMeta[cfg.ServerID] = RUNNING
 	return nil
 }
 
-// StopCancel stop a canal.
-func (s *Server) StopCanal(echoCtx echo.Context) error {
-	arg := struct {
-		SyncerId string `json:"syncer_id"`
-	}{}
+// UpdateSyncer implements that update the specified syncer and restart
+func (s *Syncer) UpdateSyncer(cfg *config.SyncerHandleConfig) error {
+	// 1. set status
+	s.syncerMeta[cfg.ServerID] = UPDATE
 
-	err := echoCtx.Bind(&arg)
+	// 2. stop specified syncer
+	s.StopSyncer(cfg.ServerID)
+
+	// 3. update config
+	s.updateSyncerConfig(cfg)
+
+	// 4. start new syncer
+	err := s.StartSyncer(cfg)
+
 	if err != nil {
-		return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
+		log.Log.Errorf("UpdateSyncer: startSyncer error : err %s", err.Error())
+		return err
 	}
-
-	req, err := json.Marshal(arg)
-
-	if req != nil {
-
-	}
-
-	if err != nil {
-		return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
-	}
-
-	s.canal.Close()
-	return echoCtx.JSON(http.StatusOK, utils.NewResp())
-}
-
-// ResetCancel reset a canal, unavailable until reset is complete
-func (s *Server) ResetCanal(echoCtx echo.Context) error {
 	return nil
 }
 
-// RemoveCanal stop a canal and remove corresponding meta.
-func (s *Server) RemoveCanal(echoCtx echo.Context) error {
-	return nil
+// updateSyncer update syncer config
+func (s *Syncer) updateSyncerConfig(cfg *config.SyncerHandleConfig) {
+	sc := &config.SyncerConfig{
+		MysqlAddr:      cfg.MysqlAddr,
+		MysqlUser:      cfg.MysqlUser,
+		MysqlPassword:  cfg.MysqlPassword,
+		MysqlCharset:   cfg.MysqlCharset,
+		MysqlPosition:  cfg.MysqlPosition,
+		ServerID:       cfg.ServerID,
+		Flavor:         cfg.Flavor,
+		DataDir:        cfg.DataDir,
+		DumpExec:       cfg.DumpExec,
+		SkipMasterData: cfg.SkipMasterData,
+		Sources:        cfg.Sources,
+		Rules:          cfg.Rules,
+		SkipNoPkTable:  cfg.SkipNoPkTable,
+	}
+	s.config.SyncerConfigs[cfg.ServerID] = sc
+}
+
+// GetSyncerStatus returns the all syncer configuration and status.
+func (s *Syncer) GetSyncersStatus() interface{} {
+	return s.syncerMeta
 }
 
 // PrepareCancel pre initialization canal.
-func (s *Server) PrepareCanal() error {
+func (s *Server) PrepareCanal(syncerId uint32) error {
 	var db string
 	dbs := map[string]struct{}{}
 	tables := make([]string, 0, len(s.rules))
@@ -90,46 +153,52 @@ func (s *Server) PrepareCanal() error {
 
 	if len(db) == 1 {
 		// one db, we can shrink using table
-		s.canal.AddDumpTables(db, tables...)
+		s.canals[syncerId].AddDumpTables(db, tables...)
 	} else {
 		// many dbs, can only assign databases to dumo
 		keys := make([]string, 0, len(dbs))
 		for key := range dbs {
 			keys = append(keys, key)
 		}
-		s.canal.AddDumpDatabases(keys...)
+		s.canals[syncerId].AddDumpDatabases(keys...)
 	}
 
-	s.canal.SetEventHandler(&eventHandler{s: s})
+	s.canals[syncerId].SetEventHandler(&eventHandler{s: s})
 
 	m := s.syncerMeta
-	m[s.config.SyncerConfig.ServerID] = PREPARE
+	m[s.config.SyncerConfigs[syncerId].ServerID] = PREPARE
 
 	return nil
 }
 
 // NewCancel creates a canal ready to start.
-func (s *Server) NewCanal() error {
+func (s *Server) NewCanal(syncerId uint32) error {
+	syncerConfig := s.config.SyncerConfigs[syncerId]
+
+	if syncerConfig == nil {
+		return ErrRuleNotExist
+	}
+
 	cfg := canal.NewDefaultConfig()
-	cfg.Addr = s.config.SyncerConfig.MysqlAddr
-	cfg.User = s.config.SyncerConfig.MysqlUser
-	cfg.Password = s.config.SyncerConfig.MysqlPassword
-	cfg.Charset = s.config.SyncerConfig.MysqlCharset
-	cfg.Flavor = s.config.SyncerConfig.Flavor
+	cfg.Addr = syncerConfig.MysqlAddr
+	cfg.User = syncerConfig.MysqlUser
+	cfg.Password = syncerConfig.MysqlPassword
+	cfg.Charset = syncerConfig.MysqlCharset
+	cfg.Flavor = syncerConfig.Flavor
 
-	cfg.ServerID = s.config.SyncerConfig.ServerID
-	cfg.Dump.ExecutionPath = s.config.SyncerConfig.DumpExec
+	cfg.ServerID = syncerConfig.ServerID
+	cfg.Dump.ExecutionPath = syncerConfig.DumpExec
 	cfg.Dump.DiscardErr = false
-	cfg.Dump.SkipMasterData = s.config.SyncerConfig.SkipMasterData
+	cfg.Dump.SkipMasterData = syncerConfig.SkipMasterData
 
-	for _, s := range s.config.Sources {
+	for _, s := range s.config.SyncerConfigs[syncerId].Sources {
 		for _, t := range s.Tables {
 			cfg.IncludeTableRegex = append(cfg.IncludeTableRegex, s.Schema+"\\."+t)
 		}
 	}
 
 	var err error
-	s.canal, err = canal.NewCanal(cfg)
+	s.canals[syncerId], err = canal.NewCanal(cfg)
 	return errors.Trace(err)
 }
 
@@ -265,8 +334,10 @@ func (h *eventHandler) String() string {
 	return "PorterEventHandler"
 }
 
+// syncLoop main method
 func (s *Server) syncLoop() {
 	defer s.wg.Done()
+
 }
 
 func (s *Server) getFieldParts(k, v string) (string, string, string) {
@@ -320,7 +391,7 @@ func (s *Server) makeColumnData(col *schema.TableColumn, value interface{}) inte
 			eNum := value - 1
 			if eNum < 0 || eNum >= int64(len(col.EnumValues)) {
 				// we insert invalid enum value before, so return empty
-				log.Warnf("invalid binlog enum index %d, for enum %v", eNum, col.EnumValues)
+				log.Log.Warnf("invalid binlog enum index %d, for enum %v", eNum, col.EnumValues)
 				return ""
 			}
 

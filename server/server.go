@@ -20,9 +20,9 @@ import (
 var ErrRuleNotExist = errors.New("rule is not exist")
 
 type Server struct {
-	syncerMeta map[uint32]int
+	syncerMeta map[uint32]SyncerType
 	config     *config.PorterConfig
-	canal      *canal.Canal
+	canals     map[uint32]*canal.Canal
 	rules      map[string]*syncer.Rule
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -53,19 +53,19 @@ func NewServer(config *config.PorterConfig) (*Server, error) {
 		return nil, errors.Trace(err)
 	}
 
-	if err = s.NewCanal(); err != nil {
+	if err = s.NewCanal(config.ServerID); err != nil {
 		return nil, errors.Trace(err)
 	}
 
-	if err = s.prepareRule(); err != nil {
+	if err = s.prepareRule(config.ServerID); err != nil {
 		return nil, errors.Trace(err)
 	}
 
-	if err = s.PrepareCanal(); err != nil {
+	if err = s.PrepareCanal(config.ServerID); err != nil {
 		return nil, errors.Trace(err)
 	}
 
-	if err = s.canal.CheckBinlogRowImage("FULL"); err != nil {
+	if err = s.canals[config.ServerID].CheckBinlogRowImage("FULL"); err != nil {
 		return nil, errors.Trace(err)
 	}
 
@@ -106,7 +106,7 @@ func (s *Server) updateRule(schema, table string) error {
 	if !ok {
 		return ErrRuleNotExist
 	}
-	tableInfo, err := s.canal.GetTable(schema, table)
+	tableInfo, err := s.canals[s.config.ServerID].GetTable(schema, table)
 	if err != nil {
 		return errors.Trace(err)
 	}
@@ -116,10 +116,11 @@ func (s *Server) updateRule(schema, table string) error {
 }
 
 func (se *Server) parseSource() (map[string][]string, error) {
-	wildTables := make(map[string][]string, len(se.config.Sources))
+	syncer := se.config.SyncerConfigs[se.config.ServerID]
+	wildTables := make(map[string][]string, len(syncer.Sources))
 
 	// first, check source
-	for _, s := range se.config.Sources {
+	for _, s := range syncer.Sources {
 		if !isValidTables(s.Tables) {
 			return nil, errors.Errorf("wildcard * is not allowed for multiple tables")
 		}
@@ -138,7 +139,7 @@ func (se *Server) parseSource() (map[string][]string, error) {
 				sql := fmt.Sprintf(`SELECT table_name FROM information_schema.tables WHERE
 					table_name RLIKE "%s" AND table_schema = "%s";`, buildTable(table), s.Schema)
 
-				res, err := se.canal.Execute(sql)
+				res, err := se.canals[syncer.ServerID].Execute(sql)
 				if err != nil {
 					return nil, errors.Trace(err)
 				}
@@ -167,14 +168,15 @@ func (se *Server) parseSource() (map[string][]string, error) {
 	return wildTables, nil
 }
 
-func (s *Server) prepareRule() error {
+func (s *Server) prepareRule(syncerId uint32) error {
+	syn := s.config.SyncerConfigs[syncerId]
 	wildtables, err := s.parseSource()
 	if err != nil {
 		return errors.Trace(err)
 	}
 
-	if s.config.Rules != nil {
-		for _, rule := range s.config.Rules {
+	if syn.Rules != nil {
+		for _, rule := range syn.Rules {
 			if len(rule.Schema) == 0 {
 				return errors.Errorf("empty schema not allowed for rule")
 			}
@@ -212,12 +214,12 @@ func (s *Server) prepareRule() error {
 
 	rules := make(map[string]*syncer.Rule)
 	for key, rule := range s.rules {
-		if rule.TableInfo, err = s.canal.GetTable(rule.Schema, rule.Table); err != nil {
+		if rule.TableInfo, err = s.canals[syncerId].GetTable(rule.Schema, rule.Table); err != nil {
 			return errors.Trace(err)
 		}
 
 		if len(rule.TableInfo.PKColumns) == 0 {
-			if !s.config.SkipNoPkTable {
+			if !syn.SkipNoPkTable {
 				return errors.Errorf("%s.%s must have a PK for a column", rule.Schema, rule.Table)
 			}
 
@@ -234,15 +236,21 @@ func ruleKey(schema, table string) string {
 	return strings.ToLower(fmt.Sprintf("%s:%s", schema, table))
 }
 
+const STATUS = "StateLeader"
+
 // Run syncs the data from mysql and process.
-func (s *Server) Run() error {
+func (s *Server) Run(syncerId uint32) error {
+	node := s.config.RaftNodeConfig.Node
+	if node.Status().RaftState.String() != STATUS {
+		return nil
+	}
 
 	s.wg.Add(1)
 
 	go s.syncLoop()
 
 	position := s.master.Position()
-	if err := s.canal.RunFrom(position); err != nil {
+	if err := s.canals[syncerId].RunFrom(position); err != nil {
 		log.Errorf("start canal err %v", err)
 		return errors.Trace(err)
 	}
@@ -257,7 +265,9 @@ func (s *Server) Ctx() context.Context {
 func (s *Server) Close() {
 	log.Infof("closing porter server")
 	s.cancel()
-	s.canal.Close()
+	for _, canal := range s.canals {
+		canal.Close()
+	}
 	s.master.Close()
 	s.wg.Wait()
 }

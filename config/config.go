@@ -16,8 +16,9 @@ import (
 
 type PorterConfig struct {
 	RaftNodeConfig
-	SyncerConfig
+	SyncerConfigs map[uint32]*SyncerConfig
 
+	ServerID    uint32 `toml:server_id`
 	AdminURLs   types.URLs
 	MetricsAddr string `toml:"stat_adr"`
 	LogDir      string `toml:"log_dir"`
