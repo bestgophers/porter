@@ -23,7 +23,7 @@ require (
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pingcap/errors v0.11.0
-	github.com/pingcap/goleveldb v0.0.0-20191226122134-f82aafb29989 // indirect
+	github.com/pingcap/goleveldb v0.0.0-20191226122134-f82aafb29989
 	github.com/pingcap/kvproto v0.0.0-20200828054126-d677e6fd224a // indirect
 	github.com/pingcap/tidb v2.0.11+incompatible // indirect
 	github.com/prometheus/client_golang v0.9.3

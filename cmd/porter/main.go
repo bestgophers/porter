@@ -50,8 +50,8 @@ func main() {
 	}
 
 	// init log
-	log.NewLogger(porterConfig.LogDir, porterConfig.LogLevel)
-	defer log.StopLoggers()
+	log.InitLoggers(porterConfig.LogDir, porterConfig.LogLevel)
+	defer log.UnInitLoggers()
 
 	// start
 	s, err := server.NewServer(porterConfig)
@@ -67,15 +67,19 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
+	done := make(chan struct{}, 1)
 	go func() {
-		for true {
-			sig := <-sc
-			if sig == syscall.SIGINT || sig == syscall.SIGTERM || sig == syscall.SIGQUIT {
-				// stop
-				os.Exit(0)
-			}
-		}
+		s.Run()
+		done <- struct{}{}
 	}()
 
-	s.Run()
+	select {
+	case n := <-sc:
+		log.Log.Infof("receive signal %v, closing", n)
+	case <-s.Ctx().Done():
+		log.Log.Infof("context is done with %v, closing", s.Ctx().Err())
+	}
+
+	s.Close()
+	<-done
 }

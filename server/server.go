@@ -236,6 +236,7 @@ func ruleKey(schema, table string) string {
 
 // Run syncs the data from mysql and process.
 func (s *Server) Run() error {
+
 	s.wg.Add(1)
 
 	go s.syncLoop()

@@ -227,7 +227,7 @@ func (s *Server) assembly(rule *syncer.Rule, action string, rows [][]interface{}
 		datas = append(datas, data)
 	}
 
-	fmt.Printf("binlog : %s", datas)
+	fmt.Printf("binlog : %v", datas)
 	return nil
 }
 
@@ -266,7 +266,7 @@ func (h *eventHandler) String() string {
 }
 
 func (s *Server) syncLoop() {
-	// todu
+	defer s.wg.Done()
 }
 
 func (s *Server) getFieldParts(k, v string) (string, string, string) {
