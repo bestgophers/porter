@@ -239,9 +239,8 @@ func ruleKey(schema, table string) string {
 const STATUS = "StateLeader"
 
 // Run syncs the data from mysql and process.
-func (s *Server) Run(syncerId uint32) error {
-	node := s.config.RaftNodeConfig.Node
-	if node.Status().RaftState.String() != STATUS {
+func (s *Server) Run() error {
+	if s.config.RaftNodeConfig.Node.Status().RaftState.String() != STATUS {
 		return nil
 	}
 
@@ -249,10 +248,12 @@ func (s *Server) Run(syncerId uint32) error {
 
 	go s.syncLoop()
 
-	position := s.master.Position()
-	if err := s.canals[syncerId].RunFrom(position); err != nil {
-		log.Errorf("start canal err %v", err)
-		return errors.Trace(err)
+	for _, sc := range s.config.SyncerConfigs {
+		position := s.master.Position()
+		if err := s.canals[sc.ServerID].RunFrom(position); err != nil {
+			log.Errorf("start canal err %v", err)
+			return errors.Trace(err)
+		}
 	}
 	return nil
 }

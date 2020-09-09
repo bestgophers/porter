@@ -338,6 +338,34 @@ func (h *eventHandler) String() string {
 func (s *Server) syncLoop() {
 	defer s.wg.Done()
 
+	lastSavedTime := time.Now()
+
+	var pos mysql.Position
+
+	for {
+		needSavePos := false
+		select {
+		case v := <-s.syncCh:
+			switch v := v.(type) {
+			case posSaver:
+				now := time.Now()
+				if v.force || now.Sub(lastSavedTime) > 3*time.Second {
+					lastSavedTime = now
+					needSavePos = true
+					pos = v.pos
+				}
+			}
+		case <-s.ctx.Done():
+			return
+		}
+		if needSavePos {
+			if err := s.master.Save(pos); err != nil {
+				log.Log.Errorf("save syncer position %s err %v, close sync", pos, err)
+				s.cancel()
+				return
+			}
+		}
+	}
 }
 
 func (s *Server) getFieldParts(k, v string) (string, string, string) {
