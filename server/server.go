@@ -54,9 +54,13 @@ func NewServer(config *config.PorterConfig) (*Server, error) {
 
 	var err error
 
-	if err = s.startRaftNode(); err != nil {
-		return nil, errors.Trace(err)
-	}
+	//if err = s.startRaftNode(); err != nil {
+	//	return nil, errors.Trace(err)
+	//}
+	go func() {
+		s.startRaftNode()
+	}()
+
 	if err = s.startAdminServer(config.AdminURLs); err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -80,7 +84,6 @@ func NewServer(config *config.PorterConfig) (*Server, error) {
 	if err = s.canals[config.ServerID].CheckBinlogRowImage("FULL"); err != nil {
 		return nil, errors.Trace(err)
 	}
-
 	return s, nil
 }
 
@@ -98,7 +101,7 @@ func (s *Server) startRaftNode() error {
 	commitC, errorC, snapshotters := pr.NewRaftNode(&s.config.RaftNodeConfig, getSnapshot, proposeC, confChangeC)
 
 	kvs = storage.NewKVStore(<-snapshotters, proposeC, commitC, errorC)
-	//pr.ServeHttpKVAPI(kvs, s.config.RaftNodeConfig.Port, confChangeC, errorC)
+	pr.ServeHttpKVAPI(kvs, s.config.RaftNodeConfig.Port, confChangeC, errorC)
 
 	return nil
 }
@@ -257,8 +260,9 @@ const STATUS = "StateLeader"
 
 // Run syncs the data from mysql and process.
 func (s *Server) Run() error {
-	time.Sleep(5 * time.Second)
-	status := s.config.RaftNodeConfig.Node.Status()
+	nodeConfig := s.config.RaftNodeConfig
+	node := nodeConfig.Node
+	status := node.Status()
 	s2 := s.config.RaftNodeConfig.Node.Status().RaftState.String()
 
 	fmt.Printf("%v", status)

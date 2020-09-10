@@ -21,7 +21,7 @@ import (
 )
 
 type RaftNode struct {
-	config.RaftNodeConfig
+	*config.RaftNodeConfig
 }
 
 func NewRaftNode(rnc *config.RaftNodeConfig, getSnapshot func() ([]byte, error), proposeC <-chan string,
@@ -36,9 +36,10 @@ func NewRaftNode(rnc *config.RaftNodeConfig, getSnapshot func() ([]byte, error),
 	rnc.ErrorC = errorC
 	rnc.GetSnapshot = getSnapshot
 
-	node := RaftNode{*rnc}
+	node := RaftNode{rnc}
 
-	go node.startRaft()
+	// go node.startRaft  reference issues
+	node.startRaft()
 	return commitC, errorC, rnc.SnapshotterReady
 }
 
