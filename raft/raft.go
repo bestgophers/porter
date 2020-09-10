@@ -44,7 +44,7 @@ func NewRaftNode(rnc *config.RaftNodeConfig, getSnapshot func() ([]byte, error),
 
 const STATE_LEADER = "StateLeader"
 
-func (r *RaftNode) IsLeader() bool {
+func (r RaftNode) IsLeader() bool {
 	if r.Node.Status().RaftState.String() != STATE_LEADER {
 		return false
 	}

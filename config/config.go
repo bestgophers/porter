@@ -17,9 +17,9 @@ type PorterConfig struct {
 	RaftNodeConfig
 	SyncerConfigs map[uint32]*SyncerConfig
 
-	ServerID    uint32 `toml:server_id`
-	AdminURLs   string `toml:admin_url`
-	MetricsAddr string `toml:"stat_adr"`
+	ServerID    uint32 `toml:"server_id"`
+	AdminURLs   string `toml:"admin_url"`
+	MetricsAddr string `toml:"stat_addr"`
 	LogDir      string `toml:"log_dir"`
 	LogLevel    string `toml:"log_level""`
 }
@@ -107,11 +107,27 @@ func NewConfig(data string) (*PorterConfig, error) {
 	}
 
 	cfg.buildRafeNodeConfig()
+	syncerConfig, err := getSyncerConfig(data)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	cfg.SyncerConfigs[cfg.ServerID] = syncerConfig
+	return &cfg, nil
+}
 
+func getSyncerConfig(data string) (*SyncerConfig, error) {
+	var cfg SyncerConfig
+
+	_, err := toml.Decode(data, &cfg)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
 	return &cfg, nil
 }
 
 func (cfg *PorterConfig) buildRafeNodeConfig() {
+	cfg.SyncerConfigs = make(map[uint32]*SyncerConfig, 12)
+
 	cfg.LogDir += fmt.Sprintf("/porter-%d", cfg.RaftNodeConfig.Id)
 
 	cfg.RaftNodeConfig.Waldir = cfg.LogDir + fmt.Sprintf(cfg.RaftNodeConfig.Waldir+"-%d", cfg.RaftNodeConfig.Id)

@@ -45,7 +45,9 @@ type Server struct {
 func NewServer(config *config.PorterConfig) (*Server, error) {
 	s := new(Server)
 
+	s.syncerMeta = make(map[uint32]SyncerType)
 	s.config = config
+	s.canals = make(map[uint32]*canal.Canal)
 	s.rules = make(map[string]*syncer.Rule)
 	s.syncCh = make(chan interface{}, 4096)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
@@ -255,7 +257,12 @@ const STATUS = "StateLeader"
 
 // Run syncs the data from mysql and process.
 func (s *Server) Run() error {
-	if s.config.RaftNodeConfig.Node.Status().RaftState.String() != STATUS {
+	time.Sleep(5 * time.Second)
+	status := s.config.RaftNodeConfig.Node.Status()
+	s2 := s.config.RaftNodeConfig.Node.Status().RaftState.String()
+
+	fmt.Printf("%v", status)
+	if s2 != STATUS {
 		return nil
 	}
 
