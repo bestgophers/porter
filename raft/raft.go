@@ -199,7 +199,7 @@ func (rc *RaftNode) writeError(err error) {
 
 func (rc *RaftNode) startRaft() {
 	if !fileutil.Exist(rc.Snapdir) {
-		if err := os.Mkdir(rc.Snapdir, 0750); err != nil {
+		if err := os.MkdirAll(rc.Snapdir, 0755); err != nil {
 			log.Fatalf("raft: cannt crete dir for snapshot (%v)", err)
 		}
 	}

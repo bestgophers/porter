@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/pingcap/errors"
 	"github.com/siddontang/go-mysql/canal"
@@ -97,17 +96,13 @@ func (s *Server) startRaftNode() error {
 	commitC, errorC, snapshotters := pr.NewRaftNode(&s.config.RaftNodeConfig, getSnapshot, proposeC, confChangeC)
 
 	kvs = storage.NewKVStore(<-snapshotters, proposeC, commitC, errorC)
-	pr.ServeHttpKVAPI(kvs, s.config.RaftNodeConfig.Port, confChangeC, errorC)
+	//pr.ServeHttpKVAPI(kvs, s.config.RaftNodeConfig.Port, confChangeC, errorC)
 
 	return nil
 }
 
-func (s *Server) startAdminServer(urls types.URLs) error {
-	if len(urls) != 1 {
-		return errors.New("binlog_server:args are not available")
-	}
-	addr := urls[0].Host
-	s.adminSvr = api.NewAdminServer(addr, NewBinlogSyncer(s))
+func (s *Server) startAdminServer(url string) error {
+	s.adminSvr = api.NewAdminServer(url, NewBinlogSyncer(s))
 	return nil
 }
 

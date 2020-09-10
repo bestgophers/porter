@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"github.com/BurntSushi/toml"
-	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/raft"
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/coreos/etcd/rafthttp"
@@ -19,7 +18,7 @@ type PorterConfig struct {
 	SyncerConfigs map[uint32]*SyncerConfig
 
 	ServerID    uint32 `toml:server_id`
-	AdminURLs   types.URLs
+	AdminURLs   string `toml:admin_url`
 	MetricsAddr string `toml:"stat_adr"`
 	LogDir      string `toml:"log_dir"`
 	LogLevel    string `toml:"log_level""`
@@ -113,8 +112,13 @@ func NewConfig(data string) (*PorterConfig, error) {
 }
 
 func (cfg *PorterConfig) buildRafeNodeConfig() {
-	cfg.RaftNodeConfig.Waldir = fmt.Sprintf(cfg.RaftNodeConfig.Waldir+"-%d", cfg.RaftNodeConfig.Id)
-	cfg.RaftNodeConfig.Snapdir = fmt.Sprintf(cfg.RaftNodeConfig.Snapdir+"-%d", cfg.RaftNodeConfig.Id)
+	cfg.LogDir += fmt.Sprintf("/porter-%d", cfg.RaftNodeConfig.Id)
+
+	cfg.RaftNodeConfig.Waldir = cfg.LogDir + fmt.Sprintf(cfg.RaftNodeConfig.Waldir+"-%d", cfg.RaftNodeConfig.Id)
+	cfg.RaftNodeConfig.Snapdir = cfg.LogDir + fmt.Sprintf(cfg.RaftNodeConfig.Snapdir+"-%d", cfg.RaftNodeConfig.Id)
+
+	cfg.LogDir += "/logs"
+
 	cfg.RaftNodeConfig.SnapCount = 10000
 	cfg.RaftNodeConfig.Stopc = make(chan struct{})
 	cfg.RaftNodeConfig.Httpstopc = make(chan struct{})

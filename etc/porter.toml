@@ -12,7 +12,7 @@ data_dir = "./var"
 
 admin_url = "127.0.0.1:5000"
 
-log_dir = "./porter-logs"
+log_dir = "/Users/eliasyao/Downloads/porter"
 log_level = "debug"
 
 # Inner Http status address
@@ -48,8 +48,8 @@ raft_cluster = ["http://127.0.0.1:8080"]
 raft_port = 8080
 raft_id = 1
 raft_join = false
-raft_wal_dir = "raft-wal"
-raft_snap_dir = "raft-snap"
+raft_wal_dir = "/raft/wal"
+raft_snap_dir = "/raft/snap"
 
 # MySQL data source
 [[source]]

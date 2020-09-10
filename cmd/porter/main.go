@@ -12,11 +12,6 @@ import (
 	"syscall"
 )
 
-var (
-	Date    string
-	Version string
-)
-
 const banner string = `
 ______          _            
 | ___ \        | |           
@@ -28,15 +23,9 @@ ______          _
 
 func main() {
 	configFile := flag.String("config", "./etc/porter.toml", "porter config file")
-	printVersion := flag.Bool("version", true, "print porter version info")
 	flag.Parse()
 
-	if *printVersion {
-		fmt.Printf("version is %s, build at %s\n", Date, Version)
-	}
-
 	fmt.Print(banner)
-	fmt.Printf("versiom is %s, build at %s\n", Date, Version)
 
 	if len(*configFile) == 0 {
 		fmt.Println("configFile.len error, err: config is nil")
