@@ -63,7 +63,7 @@ func (h *BinlogSyncerHandler) StopBinlogSyncer(echoCtx echo.Context) error {
 		return err
 	}
 
-	if h.svr.IsLeader() == false {
+	if !h.svr.IsLeader() {
 		req, err := json.Marshal(args)
 		if err != nil {
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
@@ -90,7 +90,7 @@ func (h *BinlogSyncerHandler) GetBinlogSyncersStatus(echoCtx echo.Context) error
 	h.l.Lock()
 	defer h.l.Unlock()
 
-	if h.svr.IsLeader() == false {
+	if !h.svr.IsLeader() {
 
 		resp, err := h.forwardToLeader("GET", "/stopSyncer", nil)
 		if err != nil {
@@ -120,11 +120,14 @@ func (h *BinlogSyncerHandler) UpdateBinlogSyncerConfig(echoCtx echo.Context) err
 		return err
 	}
 
-	if h.svr.IsLeader() {
-		req, err := json.Marshal(args)
-		if err != nil {
-			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
-		}
+	req, err := json.Marshal(args)
+
+	if err != nil {
+		return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
+	}
+
+	if !h.svr.IsLeader() {
+
 		resp, err := h.forwardToLeader("PUT", "/updateSyncer", req)
 		if err != nil {
 			log.Log.Errorf("StartBinlog:sendToLeader error,err:%s,args:%v", err, args)
@@ -147,6 +150,41 @@ func (h *BinlogSyncerHandler) UpdateBinlogSyncerConfig(echoCtx echo.Context) err
 func (h *BinlogSyncerHandler) IsLeader(echoCtx echo.Context) error {
 	leader := h.svr.IsLeader()
 	return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(leader))
+}
+
+// UpdatePosition used for advance or retreat specified syncer position.
+func (h *BinlogSyncerHandler) UpdatePosition(echoCtx echo.Context) error {
+	h.l.Lock()
+	defer h.l.Unlock()
+	args := struct {
+		syncerId uint32 `json:"syncer_id"`
+		position uint32 `json:"position"`
+	}{}
+
+	echoCtx.Bind(&args)
+
+	req, err := json.Marshal(args)
+	if err != nil {
+		return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
+	}
+
+	if !h.svr.IsLeader() {
+		resp, err := h.forwardToLeader("PUT", "/updatePosition", req)
+		if err != nil {
+			log.Log.Errorf("StartBinlog:sendToLeader error,err:%s,args:%v", err, args)
+			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
+		}
+		if resp.Message != "success" {
+			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(resp.Message))
+		}
+		return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(resp.Data))
+	}
+	err = h.svr.UpdatePosition(args.syncerId, args.position)
+	if err != nil {
+		log.Log.Errorf("UpdatePosition error, err:%s", err.Error())
+		return err
+	}
+	return echoCtx.JSON(http.StatusOK, utils.NewResp().SetData(""))
 }
 
 // leaderAddress variable used for cache leader address last invoke

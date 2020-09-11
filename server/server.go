@@ -39,6 +39,8 @@ type Server struct {
 	master *masterInfo
 
 	syncCh chan interface{}
+
+	runC chan uint32
 }
 
 // NewServer creates the Server form config
@@ -50,6 +52,7 @@ func NewServer(config *config.PorterConfig) (*Server, error) {
 	s.canals = make(map[uint32]*canal.Canal)
 	s.rules = make(map[string]*syncer.Rule)
 	s.syncCh = make(chan interface{}, 4096)
+	s.runC = make(chan uint32, 12)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	var err error
@@ -261,6 +264,7 @@ const STATUS = "StateLeader"
 // Run syncs the data from mysql and process.
 func (s *Server) Run() error {
 	go s.adminSvr.Run()
+	go s.runCanal()
 	//nodeConfig := s.config.RaftNodeConfig
 	//node := nodeConfig.Node
 	//status := node.Status()
@@ -283,6 +287,27 @@ func (s *Server) Run() error {
 	//	}
 	//}
 	return nil
+}
+
+func (s *Server) runCanal() {
+	select {
+	case c := <-s.runC:
+		log.Log.Infof("runCanal receive a syncer [%d], start sync binlog", c)
+		nodeConfig := s.config.RaftNodeConfig
+		node := nodeConfig.Node
+		if node != nil && node.Status().RaftState.String() == STATUS {
+			s.wg.Add(1)
+
+			go s.syncLoop()
+
+			position := s.master.Position()
+			if err := s.canals[c].RunFrom(position); err != nil {
+				log.Log.Fatalf("runCanal.runFrom error, err: %s", err.Error())
+			}
+		}
+	case <-s.config.RaftNodeConfig.Stopc:
+		return
+	}
 }
 
 // Ctx returns the internal context for outside use.

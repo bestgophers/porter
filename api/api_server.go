@@ -22,6 +22,8 @@ type APIServer interface {
 	UpdateSyncer(cfg *config.SyncerHandleConfig) error
 
 	GetSyncersStatus() interface{}
+
+	UpdatePosition(syncerId, position uint32) error
 }
 
 type AdminServer struct {
@@ -69,6 +71,7 @@ func (s *AdminServer) RegisterURL() {
 	s.web.POST("/startSyncer", s.bs.StartBinlogSyncer)
 	s.web.PUT("/updateSyncer", s.bs.UpdateBinlogSyncerConfig)
 	s.web.GET("/stopSyncer", s.bs.StopBinlogSyncer)
+	s.web.PUT("/updatePosition", s.bs.UpdatePosition)
 	s.web.GET("/isLeader", s.bs.IsLeader)
 }
 

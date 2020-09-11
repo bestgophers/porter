@@ -12,11 +12,37 @@ and the order of binlog event is exactly the the same as that on the master
 
 ### Requirements
 * go version 1.15+
+please check you go version
 ```
 go version
 ```
 
 ### Quick Start
+1. start porter
+```
+cd /cmd/porter
+
+go run main.go
+```
+
+2. send startSyncer API 
+```
+curl -H "Content-Type:application/json" -X POST --data '{
+    "mysql_addr":"127.0.0.1:3306",
+    "mysql_user":"root",
+    "mysql_password":"yaoyichen52",
+    "mysql_charset":"utf8",
+    "mysql_position":"",
+    "server_id":1001,
+    "flavor":"mysql",
+    "mysqldump":"mysqldump",
+    "skip_master_data":false,
+    "sources": [{
+        "schema":"test",
+        "tables":["test_river_0000"]
+    }]
+}' http://localhost:5050/startSyncer
+```
 
 ### License
 ```

@@ -88,8 +88,8 @@ func (b *BinlogSyncer) StartSyncer(cfg *config.SyncerHandleConfig) error {
 		return err
 	}
 
-	if err := b.PrepareCanal(cfg.ServerID); err != nil {
-		log.Log.Errorf("StartSyncer: PrepareCanal error, err: %s", err.Error())
+	if err := b.prepareRule(cfg.ServerID); err != nil {
+		log.Log.Errorf("StartSyncer: prepareRule error, err: %s", err.Error())
 		return err
 	}
 
@@ -104,6 +104,7 @@ func (b *BinlogSyncer) StartSyncer(cfg *config.SyncerHandleConfig) error {
 	}
 
 	b.syncerMeta[cfg.ServerID] = RUNNING
+	b.Server.runC <- cfg.ServerID
 	return nil
 }
 
@@ -125,6 +126,20 @@ func (b *BinlogSyncer) UpdateSyncer(cfg *config.SyncerHandleConfig) error {
 		log.Log.Errorf("UpdateSyncer: startSyncer error : err %s", err.Error())
 		return err
 	}
+	return nil
+}
+
+// UpdatePosition implements update specified syncer position through given position
+func (b *BinlogSyncer) UpdatePosition(syncerId, position uint32) error {
+	if position < 0 {
+		return ErrInvalidPara
+	}
+	//mi := b.Server.master[syncerId]
+	//if mi != nil {
+	//	mi.Lock()
+	//	defer mi.Unlock()
+	//	mi.Pos = position
+	//}
 	return nil
 }
 
@@ -263,7 +278,7 @@ func (h *eventHandler) OnXID(nextPos mysql.Position) error {
 func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
 	rule, ok := h.s.rules[ruleKey(e.Table.Schema, e.Table.Name)]
 	if !ok {
-		fmt.Println(rule)
+		log.Log.Warnf("Syncer.OnRow is exist, ruleKey: %s", ruleKey(e.Table.Schema, e.Table.Name))
 		return nil
 	}
 
@@ -309,7 +324,7 @@ func (s *Server) assembly(rule *syncer.Rule, action string, rows [][]interface{}
 		datas = append(datas, data)
 	}
 
-	fmt.Printf("binlog : %v", datas)
+	fmt.Printf("binlog : %s\n", datas)
 	return nil
 }
 
