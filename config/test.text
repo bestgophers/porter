@@ -1,0 +1,15 @@
+{
+    "mysql_addr":"127.0.0.1:3306",
+    "mysql_user":"root",
+    "mysql_password":"yaoyichen52",
+    "mysql_charset":"utf8",
+    "mysql_position":"",
+    "server_id":1001,
+    "flavor":"mysql",
+    "mysqldump":"mysqldump",
+    "skip_master_data":false,
+    "sources": [{
+        "schema":"test",
+        "tables":["test_river_0000"]
+    }]
+}

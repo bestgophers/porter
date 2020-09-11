@@ -28,12 +28,12 @@ func (h *BinlogSyncerHandler) StartBinlogSyncer(echoCtx echo.Context) error {
 		return err
 	}
 
-	if h.svr.IsLeader() {
-		req, err := json.Marshal(args)
+	req, err := json.Marshal(args)
+	if !h.svr.IsLeader() {
 		if err != nil {
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
 		}
-		resp, err := h.forwardToLeader("PUT", "startSyncer", req)
+		resp, err := h.forwardToLeader("POST", "/startSyncer", req)
 		if err != nil {
 			log.Log.Errorf("StartBinlog:sendToLeader error,err:%s,args:%v", err, args)
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
@@ -69,7 +69,7 @@ func (h *BinlogSyncerHandler) StopBinlogSyncer(echoCtx echo.Context) error {
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
 		}
 
-		resp, err := h.forwardToLeader("PUT", "/stopSyncer", req)
+		resp, err := h.forwardToLeader("GET", "/stopSyncer", req)
 		if err != nil {
 			log.Log.Errorf("StopBinlogSyncer:sendToLeander error,err:%s,args:%v", err, args)
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
@@ -92,7 +92,7 @@ func (h *BinlogSyncerHandler) GetBinlogSyncersStatus(echoCtx echo.Context) error
 
 	if h.svr.IsLeader() == false {
 
-		resp, err := h.forwardToLeader("PUT", "/stopSyncer", nil)
+		resp, err := h.forwardToLeader("GET", "/stopSyncer", nil)
 		if err != nil {
 			log.Log.Errorf("StopBinlogSyncer:sendToLeander error,err:%s,args:%v", err, nil)
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
@@ -125,7 +125,7 @@ func (h *BinlogSyncerHandler) UpdateBinlogSyncerConfig(echoCtx echo.Context) err
 		if err != nil {
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))
 		}
-		resp, err := h.forwardToLeader("PUT", "startSyncer", req)
+		resp, err := h.forwardToLeader("PUT", "/updateSyncer", req)
 		if err != nil {
 			log.Log.Errorf("StartBinlog:sendToLeader error,err:%s,args:%v", err, args)
 			return echoCtx.JSON(http.StatusInternalServerError, utils.NewResp().SetError(err.Error()))

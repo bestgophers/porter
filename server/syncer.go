@@ -27,7 +27,7 @@ const mysqlDateFormat = "2016-01-02"
 type SyncerType int8
 
 const (
-	PREPARE SyncerType = iota
+	PREPARE SyncerType = iota + 1
 	START
 	RUNNING
 	STOP
@@ -76,7 +76,7 @@ func (b *BinlogSyncer) StopSyncer(syncerId uint32) {
 
 // StartSyncer implements that start the syncer
 func (b *BinlogSyncer) StartSyncer(cfg *config.SyncerHandleConfig) error {
-	if b.syncerMeta[cfg.ServerID] != STOP {
+	if b.syncerMeta[cfg.ServerID] == START || b.syncerMeta[cfg.ServerID] == UPDATE {
 		return ErrStatusStop
 	}
 
@@ -91,6 +91,16 @@ func (b *BinlogSyncer) StartSyncer(cfg *config.SyncerHandleConfig) error {
 	if err := b.PrepareCanal(cfg.ServerID); err != nil {
 		log.Log.Errorf("StartSyncer: PrepareCanal error, err: %s", err.Error())
 		return err
+	}
+
+	if err := b.PrepareCanal(cfg.ServerID); err != nil {
+		log.Log.Errorf("StartSyncer: PrepareCanal error, err: %s", err.Error())
+		return err
+	}
+
+	if err := b.canals[cfg.ServerID].CheckBinlogRowImage("FULL"); err != nil {
+		log.Log.Errorf("StartSyncer: CheckBinlogRowImage error, err: %s", err.Error())
+		return nil
 	}
 
 	b.syncerMeta[cfg.ServerID] = RUNNING

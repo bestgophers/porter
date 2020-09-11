@@ -39,7 +39,7 @@ func NewRaftNode(rnc *config.RaftNodeConfig, getSnapshot func() ([]byte, error),
 	node := RaftNode{rnc}
 
 	// go node.startRaft  reference issues
-	node.startRaft()
+	go node.startRaft()
 	return commitC, errorC, rnc.SnapshotterReady
 }
 

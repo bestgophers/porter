@@ -16,7 +16,7 @@ type SyncerHandleConfig struct {
 	DumpExec       string `json:"mysqldump""`
 	SkipMasterData bool   `json:"skip_master_data"`
 
-	Sources       []SourceConfig `json:"source"`
-	Rules         []*syncer.Rule `json:"rule"`
+	Sources       []SourceConfig `json:"sources"`
+	Rules         []*syncer.Rule `json:"rules"`
 	SkipNoPkTable bool           `json:"skip_no_pk_table"`
 }

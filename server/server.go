@@ -69,21 +69,21 @@ func NewServer(config *config.PorterConfig) (*Server, error) {
 		return nil, errors.Trace(err)
 	}
 
-	if err = s.NewCanal(config.ServerID); err != nil {
-		return nil, errors.Trace(err)
-	}
-
-	if err = s.prepareRule(config.ServerID); err != nil {
-		return nil, errors.Trace(err)
-	}
-
-	if err = s.PrepareCanal(config.ServerID); err != nil {
-		return nil, errors.Trace(err)
-	}
-
-	if err = s.canals[config.ServerID].CheckBinlogRowImage("FULL"); err != nil {
-		return nil, errors.Trace(err)
-	}
+	//if err = s.NewCanal(config.ServerID); err != nil {
+	//	return nil, errors.Trace(err)
+	//}
+	//
+	//if err = s.prepareRule(config.ServerID); err != nil {
+	//	return nil, errors.Trace(err)
+	//}
+	//
+	//if err = s.PrepareCanal(config.ServerID); err != nil {
+	//	return nil, errors.Trace(err)
+	//}
+	//
+	//if err = s.canals[config.ServerID].CheckBinlogRowImage("FULL"); err != nil {
+	//	return nil, errors.Trace(err)
+	//}
 	return s, nil
 }
 
@@ -260,27 +260,28 @@ const STATUS = "StateLeader"
 
 // Run syncs the data from mysql and process.
 func (s *Server) Run() error {
-	nodeConfig := s.config.RaftNodeConfig
-	node := nodeConfig.Node
-	status := node.Status()
-	s2 := s.config.RaftNodeConfig.Node.Status().RaftState.String()
-
-	fmt.Printf("%v", status)
-	if s2 != STATUS {
-		return nil
-	}
-
-	s.wg.Add(1)
-
-	go s.syncLoop()
-
-	for _, sc := range s.config.SyncerConfigs {
-		position := s.master.Position()
-		if err := s.canals[sc.ServerID].RunFrom(position); err != nil {
-			log.Log.Errorf("start canal err %v", err)
-			return errors.Trace(err)
-		}
-	}
+	go s.adminSvr.Run()
+	//nodeConfig := s.config.RaftNodeConfig
+	//node := nodeConfig.Node
+	//status := node.Status()
+	//s2 := s.config.RaftNodeConfig.Node.Status().RaftState.String()
+	//
+	//fmt.Printf("%v", status)
+	//if s2 != STATUS {
+	//	return nil
+	//}
+	//
+	//s.wg.Add(1)
+	//
+	//go s.syncLoop()
+	//
+	//for _, sc := range s.config.SyncerConfigs {
+	//	position := s.master.Position()
+	//	if err := s.canals[sc.ServerID].RunFrom(position); err != nil {
+	//		log.Log.Errorf("start canal err %v", err)
+	//		return errors.Trace(err)
+	//	}
+	//}
 	return nil
 }
 
